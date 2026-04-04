@@ -54,7 +54,23 @@ function formatSize(bytes: number): string {
 }
 
 /** Split an absolute path into segments for breadcrumb rendering */
+/** Detect whether a path uses Windows-style separators */
+function isWindowsPath(path: string): boolean {
+  return /^[A-Za-z]:[\\\/]/.test(path);
+}
+
 function pathSegments(path: string): { name: string; path: string }[] {
+  if (isWindowsPath(path)) {
+    const parts = path.split(/[\\\/]/).filter(Boolean);
+    const segments: { name: string; path: string }[] = [];
+    for (let i = 0; i < parts.length; i++) {
+      segments.push({
+        name: parts[i],
+        path: i === 0 ? parts[0] + '\\' : parts.slice(0, i + 1).join('\\'),
+      });
+    }
+    return segments;
+  }
   const parts = path.split('/').filter(Boolean);
   const segments: { name: string; path: string }[] = [];
   for (let i = 0; i < parts.length; i++) {
@@ -121,11 +137,22 @@ async function collectDroppedFiles(items: DataTransferItemList): Promise<{ file:
 
 /** Join a directory path with a filename */
 function joinPath(dir: string, name: string): string {
+  if (isWindowsPath(dir)) {
+    return dir.endsWith('\\') || dir.endsWith('/') ? dir + name : dir + '\\' + name;
+  }
   return dir.endsWith('/') ? dir + name : dir + '/' + name;
 }
 
 /** Get parent directory path */
 function parentPath(path: string): string | null {
+  if (isWindowsPath(path)) {
+    // Root like "C:\" has no parent
+    if (/^[A-Za-z]:[\\\/]$/.test(path)) return null;
+    const normalized = path.replace(/\//g, '\\');
+    const idx = normalized.lastIndexOf('\\');
+    if (idx <= 2) return path.substring(0, 3); // back to "C:\"
+    return normalized.substring(0, idx);
+  }
   if (path === '/') return null;
   const idx = path.lastIndexOf('/');
   if (idx <= 0) return '/';
@@ -266,7 +293,7 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
         setWildcard(resp.wildcard);
         if (resp.wildcard) {
           setRoots(null);
-          setCurrentPath('/');
+          setCurrentPath(agent.os === 'windows' ? 'C:\\' : '/');
         } else if (resp.roots.length === 1) {
           setRoots(null);
           setCurrentPath(resp.roots[0]);
