@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/postalsys/Muti-Metroo-Manager/compare/metroo-manager-v0.1.3...metroo-manager-v0.1.4) (2026-04-04)
+
+
+### Bug Fixes
+
+* handle Windows paths in file browser ([b8e732b](https://github.com/postalsys/Muti-Metroo-Manager/commit/b8e732b4c5edf3bf62a5f29aa0e7b53d44402ac3))
+
 ## [0.1.3](https://github.com/postalsys/Muti-Metroo-Manager/compare/metroo-manager-v0.1.2...metroo-manager-v0.1.3) (2026-02-26)
 
 
