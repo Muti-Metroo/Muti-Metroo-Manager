@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { TopologyAgentInfo, FileBrowseEntry } from '../../api/types';
+import { isWindowsAgent } from '../../api/types';
 import { ERR_FILE_TRANSFER_DENIED } from '../../api/types';
 import { browseFiles, downloadFile, uploadFile, chmodFile, deleteFile } from '../../api/client';
 
@@ -291,14 +292,19 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
         const resp = await browseFiles(agent.id, 'roots');
         if (cancelled) return;
         setWildcard(resp.wildcard);
-        if (resp.wildcard) {
+        // The wildcard flag controls only "can I navigate above the root";
+        // the starting points come from `roots`. On Windows with "*" the
+        // agent returns one root per drive so we get a multi-root selector
+        // instead of being pinned to C:.
+        const respRoots = resp.roots ?? [];
+        if (respRoots.length === 1) {
           setRoots(null);
-          setCurrentPath(agent.os === 'windows' ? 'C:\\' : '/');
-        } else if (resp.roots.length === 1) {
-          setRoots(null);
-          setCurrentPath(resp.roots[0]);
+          setCurrentPath(respRoots[0]);
+        } else if (respRoots.length > 1) {
+          setRoots(respRoots);
+          setLoading(false);
         } else {
-          setRoots(resp.roots);
+          setError('Agent did not return any browsable roots (agent may be outdated)');
           setLoading(false);
         }
       } catch (err: any) {
@@ -317,7 +323,15 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
     setRefreshKey(k => k + 1);
   }, []);
 
-  const navigate = setCurrentPath;
+  const navigate = useCallback((path: string | null) => {
+    // Clear any open viewer so the navigation feels responsive — otherwise
+    // the breadcrumb click silently reloads the directory behind the viewer
+    // and the user sees nothing change until they dismiss it manually.
+    setViewingFile(null);
+    setViewContent(null);
+    setViewError(null);
+    setCurrentPath(path);
+  }, []);
 
   // Load directory listing when currentPath or refreshKey changes
   useEffect(() => {
@@ -666,8 +680,20 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
 
   const parent = currentPath ? parentPath(currentPath) : null;
   const segments = currentPath ? pathSegments(currentPath) : [];
+  // If we're sitting at one of the multi-root entries (e.g. on Windows
+  // wildcard the user picked C:\ from a list of C:\, D:\, ...), the up
+  // button should return to the drive selector even though parentPath
+  // is null at a drive root.
+  const atMultiRootEntry = currentPath !== null && roots !== null && roots.includes(currentPath);
   // If non-wildcard with roots, don't allow navigating above the root
-  const canGoUp = parent !== null && (wildcard || !roots || roots.some(r => parent.startsWith(r) || r.startsWith(parent)));
+  const canGoUp = atMultiRootEntry || (parent !== null && (wildcard || !roots || roots.some(r => parent.startsWith(r) || r.startsWith(parent))));
+  const goUp = () => {
+    if (atMultiRootEntry) {
+      navigate(null);
+    } else if (parent !== null) {
+      navigate(parent);
+    }
+  };
 
   const entryFullPath = (entry: FileBrowseEntry) => joinPath(currentPath!, entry.name);
 
@@ -689,9 +715,24 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
       {/* Toolbar with breadcrumb and actions */}
       <div className="files-toolbar">
         <div className="files-breadcrumb">
-          <button className="files-breadcrumb-segment" onClick={() => wildcard && navigate('/')}>
-            /
-          </button>
+          {isWindowsAgent(agent) ? (
+            // No single Windows root: when a multi-root selector is
+            // available, "Drives" returns to it; otherwise no leading segment.
+            roots !== null && (
+              <button className="files-breadcrumb-segment" onClick={() => navigate(null)}>
+                Drives
+              </button>
+            )
+          ) : wildcard ? (
+            // Linux wildcard: "/" lets the user navigate to the filesystem
+            // root. With non-wildcard, the user can't go above the configured
+            // root, so the "/" segment is rendered as a non-interactive label.
+            <button className="files-breadcrumb-segment" onClick={() => navigate('/')}>
+              /
+            </button>
+          ) : (
+            <span className="files-breadcrumb-current">/</span>
+          )}
           {segments.map((seg, i) => (
             <span key={seg.path}>
               {i > 0 && <span className="files-breadcrumb-sep">/</span>}
@@ -797,9 +838,9 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
             <div className="files-empty">Directory is empty</div>
           ) : (
             <div className="files-list">
-              {/* Parent directory row */}
-              {canGoUp && parent !== null && (
-                <div className="files-row files-row-dir" onClick={() => navigate(parent)}>
+              {/* Parent directory row (or drive selector when at a multi-root entry) */}
+              {canGoUp && (
+                <div className="files-row files-row-dir" onClick={goUp}>
                   <span className="files-icon">&#x1F4C1;</span>
                   <span className="files-name">..</span>
                   <span className="files-size"></span>

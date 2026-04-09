@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { TopologyAgentInfo, MeshTestResult, AgentCapabilities } from '../../api/types';
+import { isWindowsAgent } from '../../api/types';
 import { renameAgent } from '../../api/client';
 import InfoTab from './InfoTab';
 import RoutesTab from './RoutesTab';
@@ -105,7 +106,7 @@ export default function AgentPanel({ agent, isActive, meshResult, capabilities, 
     { id: 'forwards', label: 'Forwards', disabled: false },
     { id: 'shell', label: 'Shell', disabled: capabilities.shell === false || agent.shell_enabled !== true },
     { id: 'files', label: 'Files', disabled: capabilities.fileTransfer === false || !agent.file_transfer_enabled },
-    { id: 'ping', label: 'Ping', disabled: capabilities.icmp === false || agent.os === 'windows' },
+    { id: 'ping', label: 'Ping', disabled: capabilities.icmp === false || isWindowsAgent(agent) || agent.icmp_enabled !== true },
   ];
 
   const displayName = overrideName ?? agent.display_name ?? agent.short_id;

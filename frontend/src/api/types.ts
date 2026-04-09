@@ -84,7 +84,11 @@ export interface TopologyAgentInfo {
   shells?: string[];
   shell_enabled?: boolean;
   file_transfer_enabled?: boolean;
+  icmp_enabled?: boolean;
 }
+
+export const isWindowsAgent = (agent: Pick<TopologyAgentInfo, 'os'>): boolean =>
+  agent.os === 'windows';
 
 export interface TopologyConnection {
   from_agent: string;
