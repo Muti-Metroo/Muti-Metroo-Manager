@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5](https://github.com/postalsys/Muti-Metroo-Manager/compare/metroo-manager-v0.1.4...metroo-manager-v0.1.5) (2026-04-09)
+
+
+### Bug Fixes
+
+* **ui:** use local management endpoints when targeting the local agent ([aeaedcc](https://github.com/postalsys/Muti-Metroo-Manager/commit/aeaedccf6b8b8a98e355791a47a09b4743033275))
+* **ui:** Windows drive selector and local-agent capability gating ([e842c6f](https://github.com/postalsys/Muti-Metroo-Manager/commit/e842c6f5535d18ef7bddd02b6c182964d8bd2c93))
+
 ## [0.1.4](https://github.com/postalsys/Muti-Metroo-Manager/compare/metroo-manager-v0.1.3...metroo-manager-v0.1.4) (2026-04-04)
 
 
