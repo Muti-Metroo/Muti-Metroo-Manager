@@ -26,7 +26,7 @@ export default function ForwardsTab({ agent, allForwardKeys, onForwardsChanged }
     setError(null);
     setUnreachable(false);
     try {
-      const resp = await manageAgentForwards(agent.id, { action: 'list' });
+      const resp = await manageAgentForwards(agent.id, agent.is_local, { action: 'list' });
       setListeners(resp.listeners || []);
     } catch (err: any) {
       const msg = err.message || '';
@@ -54,7 +54,7 @@ export default function ForwardsTab({ agent, allForwardKeys, onForwardsChanged }
     setSuccess(null);
     try {
       const maxConn = parseInt(newMaxConn, 10);
-      await manageAgentForwards(agent.id, {
+      await manageAgentForwards(agent.id, agent.is_local, {
         action: 'add',
         key,
         address,
@@ -78,7 +78,7 @@ export default function ForwardsTab({ agent, allForwardKeys, onForwardsChanged }
     setError(null);
     setSuccess(null);
     try {
-      await manageAgentForwards(agent.id, { action: 'remove', key });
+      await manageAgentForwards(agent.id, agent.is_local, { action: 'remove', key });
       setSuccess(`Removed listener "${key}"`);
       await fetchListeners();
       onForwardsChanged();

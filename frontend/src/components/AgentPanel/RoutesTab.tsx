@@ -27,7 +27,7 @@ export default function RoutesTab({ agent, onRoutesChanged }: RoutesTabProps) {
     setError(null);
     setUnreachable(false);
     try {
-      const resp = await manageAgentRoutes(agent.id, { action: 'list' });
+      const resp = await manageAgentRoutes(agent.id, agent.is_local, { action: 'list' });
       setRoutes(resp.routes || []);
     } catch (err: any) {
       const msg = err.message || '';
@@ -51,7 +51,7 @@ export default function RoutesTab({ agent, onRoutesChanged }: RoutesTabProps) {
     setError(null);
     setSuccess(null);
     try {
-      await manageAgentRoutes(agent.id, {
+      await manageAgentRoutes(agent.id, agent.is_local, {
         action: 'add',
         network: newCidr.trim(),
         metric: parseInt(newMetric) || 100,
@@ -72,7 +72,7 @@ export default function RoutesTab({ agent, onRoutesChanged }: RoutesTabProps) {
     setError(null);
     setSuccess(null);
     try {
-      await manageAgentRoutes(agent.id, { action: 'remove', network });
+      await manageAgentRoutes(agent.id, agent.is_local, { action: 'remove', network });
       setSuccess(`Removed route ${network}`);
       await fetchRoutes();
       onRoutesChanged();

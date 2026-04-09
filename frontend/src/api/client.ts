@@ -74,12 +74,21 @@ export function triggerRouteAdvertise(): Promise<unknown> {
 
 // --- Agent management ---
 
-export function manageAgentRoutes(agentId: string, req: RouteManageRequest): Promise<RouteManageResponse> {
-  return fetchJSON(`/api/proxy/agents/${agentId}/routes/manage`, 'POST', req);
+export function manageAgentRoutes(agentId: string, isLocal: boolean, req: RouteManageRequest): Promise<RouteManageResponse> {
+  // Local agent: use the unscoped endpoint, since /agents/{self}/routes/manage
+  // would route through the mesh and an agent has no mesh route to itself.
+  const path = isLocal
+    ? '/api/proxy/routes/manage'
+    : `/api/proxy/agents/${agentId}/routes/manage`;
+  return fetchJSON(path, 'POST', req);
 }
 
-export function manageAgentForwards(agentId: string, req: ForwardManageRequest): Promise<ForwardManageResponse> {
-  return fetchJSON(`/api/proxy/agents/${agentId}/forward/manage`, 'POST', req);
+export function manageAgentForwards(agentId: string, isLocal: boolean, req: ForwardManageRequest): Promise<ForwardManageResponse> {
+  // Local agent: use the unscoped endpoint (see manageAgentRoutes).
+  const path = isLocal
+    ? '/api/proxy/forward/manage'
+    : `/api/proxy/agents/${agentId}/forward/manage`;
+  return fetchJSON(path, 'POST', req);
 }
 
 export async function downloadFile(agentId: string, path: string): Promise<Blob> {
