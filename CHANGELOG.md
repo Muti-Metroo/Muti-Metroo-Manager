@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.38](https://github.com/postalsys/Muti-Metroo-Manager/compare/metroo-manager-v0.2.37...metroo-manager-v0.2.38) (2026-10-10)
+
+
+### Bug Fixes
+
+* **deps:** resolve frontend npm vulnerabilities ([6ac0bae](https://github.com/postalsys/Muti-Metroo-Manager/commit/6ac0bae94996b50546d702bc8f2f20f2d6aa9595))
+
 ## [0.2.37](https://github.com/postalsys/Muti-Metroo-Manager/compare/metroo-manager-v0.2.37...metroo-manager-v0.2.37) (2026-10-10)
 
 
