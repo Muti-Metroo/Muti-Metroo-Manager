@@ -1,0 +1,675 @@
+/*
+ * Topology map.
+ *
+ * The map is hand-drawn SVG (see components/MetroMap), so it is styled with
+ * real CSS rather than utility classes: stroke widths, dash animations and
+ * SVG-only properties have no Tailwind equivalent. Every color resolves to a
+ * theme token from app.css, so the map follows the light/dark switch.
+ *
+ * The previous phosphor-glow treatment (drop-shadow on every station and
+ * link) is gone. Emphasis is carried by stroke weight and opacity instead,
+ * which stays readable on a light background and does not smear on a
+ * projector or a low-quality remote-desktop link.
+ */
+
+@layer components {
+  /* --- Map frame ---
+   *
+   * The map fills whatever height the topology tab gives it rather than the
+   * old fixed 400px, so a wall-mounted dashboard uses the whole screen. The
+   * fullscreen variant is the browser Fullscreen API target, hence the
+   * explicit reset of the rounding and margin. */
+  .metro-section {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    padding: 1rem;
+  }
+
+  .map-container {
+    position: relative;
+    display: flex;
+    min-height: 24rem;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+  }
+
+  .metro-svg {
+    position: relative;
+    z-index: 1;
+    display: block;
+    min-height: 0;
+    width: 100%;
+    flex: 1 1 auto;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .metro-svg.dragging {
+    cursor: grabbing;
+  }
+
+  .map-container.fullscreen {
+    min-height: 100vh;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+@layer components {
+  /* --- Connection lines --- */
+  /* Every link is drawn at the same weight: direct and relayed peerings were
+   * once styled differently, but connection state is carried by the RTT heat
+   * and the unresponsive rule instead. */
+  .connection {
+    fill: none;
+    stroke: var(--connection-heat, color-mix(in oklab, var(--color-base-content) 45%, transparent));
+    stroke-width: 5;
+    stroke-dasharray: 0 10;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+    animation: connection-flow 2.6s linear infinite;
+  }
+
+  .connection-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 18;
+    stroke-linecap: butt;
+    pointer-events: stroke;
+    cursor: pointer;
+  }
+
+  /* Direct vs indirect brightness was removed deliberately: every link is
+   * drawn at the same neutral weight to match the uniform station look. */
+  .connection.flow-reverse {
+    animation-direction: reverse;
+  }
+
+  .connection.unresponsive {
+    stroke: var(--color-error);
+    stroke-dasharray: 8, 4;
+    animation: none;
+  }
+
+  .connection.is-new {
+    animation: connection-reveal 0.6s ease-out forwards;
+  }
+
+  .connection:hover {
+    stroke: var(--color-primary);
+    stroke-width: 7;
+  }
+
+  /* --- Stations --- */
+  .station {
+    cursor: pointer;
+    outline: none;
+  }
+
+  .station:hover .station-outer,
+  .station.selected .station-outer {
+    stroke: var(--color-primary);
+    stroke-width: 4;
+  }
+
+  .station:focus-visible .station-outer {
+    stroke: var(--selection-halo);
+    stroke-width: 4;
+  }
+
+  /* Selection halo: a solid, high-contrast ring around the outermost role
+   * circle so the currently-open agent is obvious at a glance even on busy
+   * meshes. Pulses to disambiguate it from hover. */
+  .station-halo {
+    fill: none;
+    stroke: var(--selection-halo);
+    stroke-width: 3.5;
+    opacity: 0.9;
+    pointer-events: none;
+    animation: station-halo-pulse 1.8s ease-in-out infinite;
+  }
+
+  .station-outer {
+    fill: var(--color-base-100);
+    stroke-width: 3;
+  }
+
+  .station-inner {
+    stroke: none;
+  }
+
+  /* Station appearance is uniform across the mesh; the local/connected/remote
+   * distinction was removed. Mesh-test failure (.unresponsive) still
+   * overrides, because that is a separate "this host is broken" signal. */
+  .station .station-outer {
+    stroke: var(--station-remote);
+    fill: var(--color-base-100);
+  }
+
+  .station .station-inner {
+    fill: transparent;
+  }
+
+  .station.unresponsive .station-outer {
+    stroke: var(--station-unresponsive);
+    fill: var(--color-base-100);
+  }
+
+  .station.unresponsive .station-inner {
+    fill: var(--station-unresponsive);
+  }
+
+  /* Operator-picked station icon (replaces .station-outer / .station-inner
+   * when set). Connection state is already carried by the selection halo, so
+   * the icon uses the full-contrast content color for readability: the
+   * desaturated --station-remote works for a hairline stroke but vanishes as
+   * a 30px fill. Unresponsive is the only state that overrides it, so a
+   * broken host still flags red. */
+  .station-icon {
+    color: var(--color-base-content);
+  }
+
+  .station.unresponsive .station-icon {
+    color: var(--station-unresponsive);
+  }
+
+  .station:hover .station-icon,
+  .station.selected .station-icon {
+    color: var(--color-primary);
+  }
+
+  /* --- Station labels --- */
+  .station-label {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    fill: var(--color-base-content);
+    text-anchor: middle;
+    pointer-events: none;
+  }
+
+  .station-label.above {
+    dominant-baseline: auto;
+  }
+
+  .station-label.below {
+    dominant-baseline: hanging;
+  }
+
+  .station-label.left {
+    text-anchor: end;
+  }
+
+  .station-label.right {
+    text-anchor: start;
+  }
+
+  /* --- Station tooltip --- */
+  .station-tooltip {
+    position: fixed;
+    z-index: 1000;
+    min-width: 200px;
+    max-width: 320px;
+    overflow: hidden;
+    border: 1px solid var(--surface-float-border);
+    border-radius: var(--radius-box);
+    background: var(--surface-float);
+    color: var(--color-base-content);
+    font-size: 0.75rem;
+    pointer-events: auto;
+    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.5);
+  }
+
+  .station-tooltip .tooltip-header {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--surface-float-border);
+    background: color-mix(in oklab, var(--color-base-content) 4%, transparent);
+  }
+
+  .station-tooltip .tooltip-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--color-base-content);
+  }
+
+  .station-tooltip .tooltip-name-clickable {
+    cursor: pointer;
+  }
+
+  .station-tooltip .tooltip-name-clickable:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+
+  .station-tooltip .tooltip-roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .tooltip-role-badge {
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .tooltip-role-badge.ingress {
+    color: var(--role-ingress);
+  }
+  .tooltip-role-badge.exit {
+    color: var(--role-exit);
+  }
+  .tooltip-role-badge.transit {
+    color: var(--role-transit);
+  }
+  .tooltip-role-badge.forward_ingress {
+    color: var(--role-forward-ingress);
+  }
+  .tooltip-role-badge.forward_exit {
+    color: var(--role-forward-exit);
+  }
+
+  .station-tooltip .tooltip-info {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .station-tooltip .tooltip-info-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.1rem 0;
+  }
+
+  .station-tooltip .tooltip-info-label {
+    color: var(--color-muted);
+  }
+
+  .station-tooltip .tooltip-info-value {
+    font-family: var(--font-mono);
+  }
+
+  .station-tooltip .tooltip-id-section {
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--surface-float-border);
+    background: color-mix(in oklab, var(--color-base-content) 4%, transparent);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  .station-tooltip .tooltip-id-section:hover {
+    background: color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  }
+
+  .station-tooltip .tooltip-id-label {
+    margin-bottom: 0.15rem;
+    font-size: 0.625rem;
+    color: var(--color-muted);
+  }
+
+  .station-tooltip .tooltip-id {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-primary);
+    word-break: break-all;
+  }
+
+  .station-tooltip .tooltip-id-hint {
+    margin-top: 0.2rem;
+    font-size: 0.625rem;
+    font-style: italic;
+    color: var(--color-muted);
+  }
+
+  /* Scoped like .tooltip-id so it wins on specificity rather than !important. */
+  .station-tooltip .tooltip-id.tooltip-id-copied {
+    color: var(--color-success);
+    font-weight: 600;
+  }
+
+  /* --- Tooltip sections --- */
+  .tooltip-section {
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--surface-float-border);
+    background: color-mix(in oklab, var(--color-base-content) 4%, transparent);
+  }
+
+  .tooltip-section-header {
+    margin-bottom: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .tooltip-section-header.socks5 {
+    color: var(--role-ingress);
+  }
+  .tooltip-section-header.exits {
+    color: var(--role-exit);
+  }
+  .tooltip-section-header.forwards {
+    color: var(--role-forward-ingress);
+  }
+  .tooltip-section-header.reachability {
+    color: var(--role-transit);
+  }
+  .tooltip-section-header.access {
+    color: var(--color-primary);
+  }
+  .tooltip-section-header.notes {
+    color: var(--color-warning);
+  }
+
+  .tooltip-notes-preview {
+    max-width: 340px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .tooltip-section-value {
+    font-family: var(--font-mono);
+  }
+
+  .tooltip-access-tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .tooltip-access-tag {
+    color: var(--color-primary);
+  }
+
+  .tooltip-access-enabled {
+    color: var(--role-exit);
+  }
+
+  .tooltip-access-na {
+    font-style: italic;
+    color: var(--color-muted);
+  }
+
+  .tooltip-exits-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .tooltip-cidr {
+    color: var(--role-exit);
+  }
+
+  .tooltip-domain {
+    color: var(--color-accent);
+  }
+
+  .tooltip-forward-key {
+    color: var(--role-forward-ingress);
+  }
+
+  .tooltip-cidr-more {
+    padding: 0.1rem 0.35rem;
+    font-size: 0.625rem;
+    font-style: italic;
+    color: var(--color-muted);
+  }
+
+  .tooltip-forwards-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .tooltip-forwards-header {
+    margin-bottom: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--role-forward-ingress);
+  }
+
+  .tooltip-forwards-header:not(:first-child) {
+    margin-top: 0.5rem;
+  }
+
+  .tooltip-reachability-ok,
+  .tooltip-reachability-error {
+    font-family: var(--font-mono);
+  }
+
+  .tooltip-reachability-ok {
+    color: var(--role-exit);
+  }
+
+  .tooltip-reachability-error {
+    color: var(--color-error);
+  }
+
+  /* --- Connection tooltip --- */
+  .connection-tooltip {
+    position: fixed;
+    z-index: 1000;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--surface-float-border);
+    border-radius: var(--radius-box);
+    background: var(--surface-float);
+    color: var(--color-base-content);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.5);
+  }
+
+  .connection-direction {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+  }
+
+  .connection-arrow {
+    flex-shrink: 0;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--color-primary);
+  }
+
+  .connection-role {
+    margin-top: 0.25rem;
+    font-size: 0.6875rem;
+    color: var(--color-muted);
+  }
+
+  .connection-transport {
+    margin-top: 0.25rem;
+    color: var(--color-accent);
+  }
+
+  .connection-rtt {
+    margin-top: 0.25rem;
+    font-family: var(--font-mono);
+    color: var(--role-exit);
+  }
+
+  .connection-rtt.unresponsive {
+    font-weight: 600;
+    color: var(--color-error);
+  }
+
+  /* --- Connection group hover --- */
+  .connection-group {
+    cursor: pointer;
+  }
+
+  .connection-group:hover .connection {
+    stroke: var(--color-primary);
+    stroke-width: 7;
+  }
+
+  /* --- Path highlighting --- */
+  .station.path-highlighted .station-outer {
+    stroke: var(--color-primary);
+    stroke-width: 4;
+  }
+
+  .station.path-highlighted .station-icon {
+    color: var(--color-primary);
+  }
+
+  .station.path-dimmed {
+    opacity: 0.25;
+  }
+
+  .connection-group.path-highlighted .connection {
+    stroke: var(--color-primary);
+    stroke-width: 8;
+  }
+
+  .connection-group.path-dimmed {
+    opacity: 0.15;
+  }
+
+  /* Smooth transitions for highlighting */
+  .station,
+  .station .station-outer,
+  .station .station-inner,
+  .station .station-icon,
+  .connection-group,
+  .connection-group .connection {
+    /* stroke-width is deliberately absent: it is the one property here that
+     * invalidates geometry rather than just paint, and an instant width jump
+     * reads as sharper feedback anyway. */
+    transition:
+      opacity 0.2s ease,
+      color 0.2s ease,
+      stroke 0.2s ease;
+  }
+
+  /* --- Reachability --- */
+  .station.unreachable .station-outer {
+    stroke: var(--station-unresponsive);
+  }
+
+  .station.unreachable .station-inner {
+    fill: color-mix(in oklab, var(--station-unresponsive) 30%, transparent);
+  }
+
+  /* --- Network boxes (operator-drawn grouping rectangles) --- */
+  .snap-grid {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .snap-grid circle {
+    fill: color-mix(in oklab, var(--color-base-content) 20%, transparent);
+  }
+
+  .network-box-fill {
+    fill: var(--color-primary);
+    fill-opacity: 0.05;
+    stroke: color-mix(in oklab, var(--color-base-content) 25%, transparent);
+    stroke-width: 1.5;
+    pointer-events: none;
+  }
+
+  /* A box whose members no longer all sit inside it. */
+  .network-box.violated .network-box-fill {
+    fill: var(--color-warning);
+    fill-opacity: 0.06;
+    stroke: var(--color-warning);
+    stroke-dasharray: 7 5;
+  }
+
+  .network-box-hit {
+    stroke: transparent;
+    stroke-width: 14;
+    pointer-events: stroke;
+    cursor: move;
+  }
+
+  .network-box-label {
+    cursor: text;
+  }
+
+  .network-box-label-bg {
+    fill: var(--color-base-100);
+    stroke: color-mix(in oklab, var(--color-base-content) 25%, transparent);
+    stroke-width: 1;
+  }
+
+  .network-box.violated .network-box-label-bg {
+    stroke: var(--color-warning);
+  }
+
+  .network-box-label-text {
+    fill: color-mix(in oklab, var(--color-base-content) 75%, transparent);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    pointer-events: auto;
+  }
+
+  .network-box-input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 2px 6px;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-field);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    outline: none;
+  }
+}
+
+@keyframes connection-flow {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+@keyframes connection-reveal {
+  from {
+    stroke-dasharray: 9999;
+    stroke-dashoffset: 9999;
+    opacity: 0;
+  }
+  to {
+    stroke-dasharray: 9999;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* Opacity only: animating stroke-width would invalidate the circle's
+ * geometry every frame, for as long as an agent stays selected. */
+@keyframes station-halo-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connection,
+  .station-halo,
+  .connection.is-new {
+    animation: none;
+  }
+}

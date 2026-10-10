@@ -1,0 +1,11 @@
+node_modules
+dist
+../internal/webui/dist
+package-lock.json
+tsconfig.tsbuildinfo
+public
+
+# Generated verbatim from the upstream Google Fonts stylesheet by
+# scripts/vendor-fonts.mjs. Formatting it here would make every regeneration
+# show up as a diff against the generator's own output.
+src/styles/fonts.css

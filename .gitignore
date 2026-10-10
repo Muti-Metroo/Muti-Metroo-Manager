@@ -1,0 +1,42 @@
+# Build output
+build/
+dist/
+muti-metroo-manager
+/manager
+internal/webui/dist/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# Stray Vite/Vitest cache dropped at repo root by ad-hoc test runs
+/node_modules/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Local dev artifacts dropped by ad-hoc `go run` invocations
+/muti-metroo-manager.db
+/muti-metroo-manager.db-*
+/muti-metroo-manager.lock
