@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.42](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.41...metroo-manager-v0.2.42) (2026-10-11)
+
+
+### Miscellaneous Chores
+
+* re-cut release on consolidated history ([a352665](https://github.com/Muti-Metroo/Muti-Metroo-Manager/commit/a352665e04388eedccf47ee23ce2f41b475bf7a0))
+
 ## [0.2.41](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.40...metroo-manager-v0.2.41) (2026-10-11)
 
 
