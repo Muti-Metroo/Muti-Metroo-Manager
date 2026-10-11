@@ -91,7 +91,11 @@ func (h *fileHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", noStore)
-	content, _ := io.ReadAll(f)
+	content, err := io.ReadAll(f)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(content)
 }

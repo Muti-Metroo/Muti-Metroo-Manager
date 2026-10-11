@@ -68,6 +68,22 @@ and pin the manager to `127.0.0.1:3000` (or set `-auth-token-file`) — the
 login cookie is marked `Secure` automatically when the request arrives over
 HTTPS (`X-Forwarded-Proto: https`).
 
+### WebSocket agent-token exposure
+
+Browsers cannot set headers on a WebSocket upgrade, so in *passthrough* mode
+(no `-agent-token` on the manager; the operator pastes the agent token into
+the UI) the shell/ICMP sockets carry the agent token as `?token=...` in the
+request URL. The manager itself never logs query strings (its access log
+records `URL.Path` only), but the URL still lands in **browser history** and
+in the **access logs of any fronting reverse proxy** (which typically log the
+full request line). When that matters, prefer configuring the agent token
+server-side (`-agent-token-file`): the manager then injects it as an
+`Authorization` header on the upstream dial and browser URLs stay clean. A
+subprotocol- or cookie-based handoff was considered, but the upstream agent
+authenticates WebSocket upgrades via the `Authorization` header or the
+`?token=` query parameter, so there is no in-band alternative the browser can
+use today.
+
 ## Configuration
 
 Muti Metroo Manager reads its configuration from three layers — built-in

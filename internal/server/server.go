@@ -413,10 +413,23 @@ func downloadsFileHandler(b *downloads.Bundle) http.Handler {
 		defer rc.Close()
 		w.Header().Set("Content-Type", contentTypeFor(downloadName))
 		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
-		w.Header().Set("Content-Disposition", `attachment; filename="`+downloadName+`"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="`+sanitizeFilename(downloadName)+`"`)
 		w.WriteHeader(http.StatusOK)
 		io.Copy(w, rc)
 	})
+}
+
+// sanitizeFilename makes an operator-supplied (manifest) download name
+// safe to embed in a Content-Disposition quoted-string: quotes,
+// backslashes and control characters are flattened to underscores so
+// a crafted name can't break out of the quoting.
+func sanitizeFilename(name string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '"' || r == '\\' || r < 0x20 || r == 0x7f {
+			return '_'
+		}
+		return r
+	}, name)
 }
 
 // contentTypeFor returns a sensible mime type for the artifacts we ship

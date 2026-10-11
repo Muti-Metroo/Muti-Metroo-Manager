@@ -82,3 +82,22 @@ func TestMaxJSONBody(t *testing.T) {
 		})
 	}
 }
+
+// The manifest-supplied download name lands inside a quoted
+// Content-Disposition filename; quotes, backslashes and control
+// characters must be flattened so it can't break the header.
+func TestSanitizeFilename(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"muti-metroo-linux-amd64", "muti-metroo-linux-amd64"},
+		{"manual v1.2.pdf", "manual v1.2.pdf"},
+		{`evil".exe`, "evil_.exe"},
+		{`back\slash.exe`, "back_slash.exe"},
+		{"newline\ninjection", "newline_injection"},
+		{"carriage\rreturn", "carriage_return"},
+	}
+	for _, tc := range cases {
+		if got := sanitizeFilename(tc.in); got != tc.want {
+			t.Errorf("sanitizeFilename(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

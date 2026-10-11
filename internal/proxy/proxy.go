@@ -16,6 +16,12 @@ type Proxy struct {
 	longClient *http.Client
 }
 
+// maxIdleConnsPerHost keeps a polling dashboard (topology refresh,
+// monitoring ticks) from churning TCP connections to the single agent
+// upstream. The http.Transport default of 2 is sized for browsing
+// many hosts, not for one hot upstream.
+const maxIdleConnsPerHost = 16
+
 // New creates a proxy targeting the given agent URL. tlsCfg configures
 // verification of the agent's certificate for https:// agent URLs; nil
 // means default verification against the system roots (see
@@ -27,22 +33,40 @@ func New(agentURL, agentToken string, tlsCfg *tls.Config) *Proxy {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
-				TLSClientConfig: tlsCfg,
+				TLSClientConfig:     tlsCfg,
+				MaxIdleConnsPerHost: maxIdleConnsPerHost,
 			},
 		},
 		longClient: &http.Client{
 			Timeout: 30 * time.Minute,
 			Transport: &http.Transport{
-				TLSClientConfig: tlsCfg,
+				TLSClientConfig:     tlsCfg,
+				MaxIdleConnsPerHost: maxIdleConnsPerHost,
 			},
 		},
 	}
 }
 
 // isWebSocketUpgrade checks if the request is a WebSocket upgrade.
+// The Connection header is a comma-separated token list — browsers
+// send the bare "Upgrade", but a fronting reverse proxy may hand us
+// "keep-alive, Upgrade" instead.
 func isWebSocketUpgrade(r *http.Request) bool {
-	return strings.EqualFold(r.Header.Get("Connection"), "Upgrade") &&
+	return headerHasToken(r.Header, "Connection", "upgrade") &&
 		strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
+}
+
+// headerHasToken reports whether the named header carries the given
+// token in any of its comma-separated values.
+func headerHasToken(h http.Header, name, token string) bool {
+	for _, v := range h.Values(name) {
+		for _, t := range strings.Split(v, ",") {
+			if strings.EqualFold(strings.TrimSpace(t), token) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isLongTimeout returns true for paths that need extended timeouts (file transfer).
@@ -104,7 +128,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// Copy response headers
+	// Copy response headers, dropping hop-by-hop ones (plus any the
+	// agent names in its Connection header) — they describe the
+	// agent↔manager hop and must not be forwarded to the client.
+	stripHopByHop(resp.Header)
 	for k, vv := range resp.Header {
 		for _, v := range vv {
 			w.Header().Add(k, v)
@@ -113,13 +140,17 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(resp.StatusCode)
 
-	// Use flusher for streaming responses (file downloads)
+	// Use flusher for streaming responses (file downloads). A failed
+	// write means the client is gone; abort instead of draining the
+	// rest of the upstream body pointlessly.
 	if flusher, ok := w.(http.Flusher); ok && isLongTimeout(agentPath) {
 		buf := make([]byte, 32*1024)
 		for {
 			n, readErr := resp.Body.Read(buf)
 			if n > 0 {
-				w.Write(buf[:n])
+				if _, err := w.Write(buf[:n]); err != nil {
+					return
+				}
 				flusher.Flush()
 			}
 			if readErr != nil {
@@ -128,5 +159,31 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		io.Copy(w, resp.Body)
+	}
+}
+
+// hopByHopHeaders are the RFC 7230 §6.1 connection-specific headers
+// that must not be relayed end-to-end.
+var hopByHopHeaders = []string{
+	"Connection",
+	"Keep-Alive",
+	"Proxy-Authenticate",
+	"Proxy-Authorization",
+	"TE",
+	"Trailer",
+	"Transfer-Encoding",
+	"Upgrade",
+}
+
+// stripHopByHop removes the fixed hop-by-hop headers from h, plus any
+// extra header fields named by the Connection token list.
+func stripHopByHop(h http.Header) {
+	for _, tok := range strings.Split(h.Get("Connection"), ",") {
+		if tok = strings.TrimSpace(tok); tok != "" {
+			h.Del(tok)
+		}
+	}
+	for _, k := range hopByHopHeaders {
+		h.Del(k)
 	}
 }
