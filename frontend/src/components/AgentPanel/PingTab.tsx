@@ -47,6 +47,7 @@ export default function PingTab({ agent, onDisabled }: PingTabProps) {
   const countRef = useRef(pingCount);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(false);
 
   function clearSeqTimeout(seq: number): void {
@@ -61,6 +62,10 @@ export default function PingTab({ agent, onDisabled }: PingTabProps) {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
+    }
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
     }
     for (const t of timeoutsRef.current.values()) clearTimeout(t);
     timeoutsRef.current.clear();
@@ -135,12 +140,16 @@ export default function PingTab({ agent, onDisabled }: PingTabProps) {
               intervalRef.current = null;
               stoppedRef.current = true;
               setStatus('stopped');
-              // Close WS after allowing time for last replies
-              setTimeout(() => {
-                if (wsRef.current) {
-                  wsRef.current.close();
-                  wsRef.current = null;
-                }
+              // Close WS after allowing time for last replies. The timer
+              // is tracked in closeTimerRef (cleared by cleanup) and the
+              // identity check guards against a session the operator
+              // started in the grace window — without both, the stale
+              // timer would close the NEW session's socket.
+              closeTimerRef.current = setTimeout(() => {
+                closeTimerRef.current = null;
+                if (wsRef.current !== ws) return;
+                wsRef.current.close();
+                wsRef.current = null;
                 setActiveTarget(null);
               }, PING_TIMEOUT + 500);
             }
