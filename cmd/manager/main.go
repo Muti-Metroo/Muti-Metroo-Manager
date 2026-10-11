@@ -114,12 +114,6 @@ func runServer(args []string) int {
 	}
 
 	prober := agentprobe.New(cfg.Agent, cfg.AgentToken, 5*time.Second, agentTLS)
-	// Run the probe concurrently so a slow/unreachable agent doesn't
-	// add 5s to startup. The banner waits up to 1s for a fresh
-	// answer; anything later is an "unknown" result the operator can
-	// re-check via /healthz.
-	probeCh := make(chan agentprobe.Result, 1)
-	go func() { probeCh <- prober.Health(context.Background()) }()
 
 	var metricsReg *metrics.Registry
 	if cfg.MetricsAddr != "" {
@@ -141,6 +135,18 @@ func runServer(args []string) int {
 		SoundsLocked: cfg.NoSounds,
 	})
 
+	// One background goroutine runs the startup probe and seeds the
+	// /healthz cache with its result, so a slow/unreachable agent never
+	// delays startup. The banner below waits up to 1s on the same probe
+	// to report reachability; anything later shows "probe still running"
+	// and the operator can re-check via /healthz.
+	probe := &startupProbe{done: make(chan struct{})}
+	go func() {
+		probe.result = prober.Health(context.Background())
+		seedHealth(probe.result)
+		close(probe.done)
+	}()
+
 	metricsSrv := server.MetricsServer(cfg.MetricsAddr, metricsReg)
 	metricsErrCh := make(chan error, 1)
 	if metricsSrv != nil {
@@ -152,27 +158,25 @@ func runServer(args []string) int {
 
 	serveErrCh := make(chan error, 1)
 	go func() {
-		var probe agentprobe.Result
-		select {
-		case probe = <-probeCh:
-			seedHealth(probe)
-			// keep the cache fresh once the probe finally lands if
-			// we showed a "still running" banner above
-		case <-time.After(time.Second):
-			probe = agentprobe.Result{Error: "probe still running"}
-			go func() { seedHealth(<-probeCh) }()
-		}
-		printStartupBanner(logger, bannerInputs{
-			cfg:            cfg,
-			store:          st,
-			lock:           lock,
-			bundle:         bundle,
-			bundlePath:     bundleSrc,
-			bundleDisabled: bundleDisabled,
-			probe:          probe,
-		})
 		serveErrCh <- srv.ListenAndServe()
 	}()
+
+	var probeResult agentprobe.Result
+	select {
+	case <-probe.done:
+		probeResult = probe.result
+	case <-time.After(time.Second):
+		probeResult = agentprobe.Result{Error: "probe still running"}
+	}
+	printStartupBanner(logger, bannerInputs{
+		cfg:            cfg,
+		store:          st,
+		lock:           lock,
+		bundle:         bundle,
+		bundlePath:     bundleSrc,
+		bundleDisabled: bundleDisabled,
+		probe:          probeResult,
+	})
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -221,6 +225,14 @@ func runServer(args []string) int {
 // shutdownTimeout bounds how long SIGINT/SIGTERM waits for in-flight
 // HTTP requests to drain before the process exits anyway.
 const shutdownTimeout = 15 * time.Second
+
+// startupProbe hands the one-shot agent probe result to both the
+// /healthz cache seeder and the startup banner without running the
+// probe twice: the goroutine closes done once result is set.
+type startupProbe struct {
+	done   chan struct{}
+	result agentprobe.Result
+}
 
 // bannerInputs is the cohesive bundle of state the startup banner
 // renders — pulling them into a struct lets the caller assemble the

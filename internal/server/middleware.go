@@ -33,7 +33,12 @@ func accessLog(logger *slog.Logger, next http.Handler) http.Handler {
 		w.Header().Set("X-Request-ID", reqID)
 		ctx := context.WithValue(r.Context(), reqIDKey, reqID)
 
-		ww := &statusRecorder{ResponseWriter: w, status: 200}
+		// Reuse the recorder instrumentMiddleware installed when metrics
+		// are on so the request carries one wrapper, not two.
+		ww, ok := w.(*statusRecorder)
+		if !ok {
+			ww = &statusRecorder{ResponseWriter: w, status: 200}
+		}
 		start := time.Now()
 
 		defer func() {

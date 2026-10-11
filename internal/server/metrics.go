@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/postalsys/muti-metroo-manager/internal/metrics"
 )
@@ -70,20 +71,35 @@ func (in *instrumentation) observe(method, route, status string, latency float64
 
 // instrumentMiddleware records request count + latency. It must sit
 // outside accessLog so both observers see the same final status and
-// inside CORS so preflight OPTIONS requests are also counted.
+// inside CORS so preflight OPTIONS requests are also counted. The
+// statusRecorder it installs is reused by accessLog (see middleware.go)
+// so a request pays for one wrapper, not two.
 func instrumentMiddleware(inst *instrumentation, next http.Handler) http.Handler {
 	if inst == nil {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ww := &statusRecorder{ResponseWriter: w, status: 200}
-		start := nowFunc()
+		start := time.Now()
 		defer func() {
-			inst.observe(r.Method, routeLabel(r.URL.Path), strconv.Itoa(ww.status),
-				nowFunc().Sub(start).Seconds())
+			inst.observe(methodLabel(r.Method), routeLabel(r.URL.Path), strconv.Itoa(ww.status),
+				time.Since(start).Seconds())
 		}()
 		next.ServeHTTP(ww, r)
 	})
+}
+
+// methodLabel whitelists the HTTP methods the manager's routes actually
+// use; anything else lands in OTHER. Combined with routeLabel this keeps
+// the per-request series count bounded — a client cycling exotic verbs
+// would otherwise mint a new counter series per verb.
+func methodLabel(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut,
+		http.MethodPatch, http.MethodDelete, http.MethodOptions:
+		return method
+	}
+	return "OTHER"
 }
 
 // routeLabel collapses high-cardinality URL paths so series count
