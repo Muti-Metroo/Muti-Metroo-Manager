@@ -11,6 +11,10 @@ interface PingResult {
 
 interface PingTabProps {
   agent: TopologyAgentInfo;
+  // False while the whole agent panel is hidden (another agent selected).
+  // The echo interval pauses so a backgrounded panel doesn't keep sending
+  // 1 echo/s; the session resumes when the panel becomes visible again.
+  isActive: boolean;
   onDisabled: () => void;
 }
 
@@ -31,7 +35,7 @@ const PING_STATUS_DOT: Record<PingStatus, string> = {
   error: 'status-error',
 };
 
-export default function PingTab({ agent, onDisabled }: PingTabProps) {
+export default function PingTab({ agent, isActive, onDisabled }: PingTabProps) {
   const [targetInput, setTargetInput] = useState('');
   const [pingCount, setPingCount] = useState(10);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -49,6 +53,14 @@ export default function PingTab({ agent, onDisabled }: PingTabProps) {
   const timeoutsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(false);
+  // Mirrors isActive for the WS message handlers, which close over the
+  // session effect and would otherwise see a stale value.
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+  // Set while the echo interval is paused because the panel is hidden.
+  const pausedRef = useRef(false);
+  // Restarts the echo interval after a pause; installed on init_ack.
+  const startIntervalRef = useRef<(() => void) | null>(null);
 
   function clearSeqTimeout(seq: number): void {
     const tid = timeoutsRef.current.get(seq);
@@ -63,6 +75,8 @@ export default function PingTab({ agent, onDisabled }: PingTabProps) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    startIntervalRef.current = null;
+    pausedRef.current = false;
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
@@ -114,7 +128,7 @@ export default function PingTab({ agent, onDisabled }: PingTabProps) {
       if (msg.type === 'init_ack') {
         if (msg.success) {
           setStatus('running');
-          intervalRef.current = setInterval(() => {
+          const tick = () => {
             seqRef.current += 1;
             const seq = seqRef.current;
             const now = Date.now();
@@ -153,7 +167,18 @@ export default function PingTab({ agent, onDisabled }: PingTabProps) {
                 setActiveTarget(null);
               }, PING_TIMEOUT + 500);
             }
-          }, PING_INTERVAL);
+          };
+          startIntervalRef.current = () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = setInterval(tick, PING_INTERVAL);
+          };
+          // Don't start ticking while the panel is hidden; the visibility
+          // effect below starts the interval when it becomes visible.
+          if (isActiveRef.current) {
+            startIntervalRef.current();
+          } else {
+            pausedRef.current = true;
+          }
         } else {
           const err = msg.error || 'Init failed';
           if (err.toLowerCase().includes('disabled')) {
@@ -211,6 +236,24 @@ export default function PingTab({ agent, onDisabled }: PingTabProps) {
 
     return cleanup;
   }, [agent.id, activeTarget]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pause the echo interval while the panel is hidden (operator switched to
+  // another agent); resume when it becomes visible again. The WebSocket and
+  // collected results stay alive — only the 1 echo/s send loop stops.
+  useEffect(() => {
+    if (isActive) {
+      if (pausedRef.current && startIntervalRef.current) {
+        pausedRef.current = false;
+        startIntervalRef.current();
+      }
+      return;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      pausedRef.current = true;
+    }
+  }, [isActive]);
 
   const handleStart = useCallback(() => {
     const target = targetInput.trim();

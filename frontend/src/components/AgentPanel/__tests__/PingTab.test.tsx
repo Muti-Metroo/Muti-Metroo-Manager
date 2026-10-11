@@ -57,7 +57,7 @@ describe('PingTab session lifecycle', () => {
   });
 
   it('auto-stop timer from a finished session must not kill the next session', () => {
-    render(<PingTab agent={agent} onDisabled={() => {}} />);
+    render(<PingTab agent={agent} isActive={true} onDisabled={() => {}} />);
 
     // First session: connect, ack, exhaust the 10-ping count so the
     // auto-stop close timer (PING_TIMEOUT + 500ms) is scheduled.
@@ -90,5 +90,37 @@ describe('PingTab session lifecycle', () => {
     // (the target renders in both the status row and the Dest stat).
     expect(second.closed).toBe(false);
     expect(screen.getAllByText('8.8.8.8').length).toBeGreaterThan(0);
+  });
+
+  it('pauses the echo interval while the panel is hidden and resumes on return', () => {
+    const { rerender } = render(<PingTab agent={agent} isActive={true} onDisabled={() => {}} />);
+
+    // Unlimited session so the auto-stop count never kicks in.
+    fireEvent.change(screen.getByLabelText('Ping target'), { target: { value: '8.8.8.8' } });
+    fireEvent.change(screen.getByLabelText('Ping count'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    const ws = MockWebSocket.instances[0];
+    act(() => {
+      ws.open();
+      ws.receive({ type: 'init_ack', success: true });
+      vi.advanceTimersByTime(3_000);
+    });
+    // init message + 3 echo frames
+    expect(ws.sent.filter(s => s.includes('"echo"'))).toHaveLength(3);
+
+    // Panel hidden: no more echoes go out, socket stays open.
+    rerender(<PingTab agent={agent} isActive={false} onDisabled={() => {}} />);
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+    expect(ws.sent.filter(s => s.includes('"echo"'))).toHaveLength(3);
+    expect(ws.closed).toBe(false);
+
+    // Panel visible again: the interval resumes.
+    rerender(<PingTab agent={agent} isActive={true} onDisabled={() => {}} />);
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+    expect(ws.sent.filter(s => s.includes('"echo"'))).toHaveLength(5);
   });
 });

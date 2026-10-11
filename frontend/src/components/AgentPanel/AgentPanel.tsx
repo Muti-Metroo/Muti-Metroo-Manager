@@ -193,6 +193,16 @@ export default function AgentPanel({
 
   const fullBleed = tabs.some(t => t.id === activeTab && t.fullBleed);
 
+  // Once the shell tab has been opened it stays mounted (hidden with
+  // display:none when another tab is active) so switching panel tabs no
+  // longer destroys the terminal session — the same pattern App uses for
+  // agent switching. Shell sessions are operator-started, so an unvisited
+  // shell tab costs nothing.
+  const [shellVisited, setShellVisited] = useState(activeTab === 'shell');
+  useEffect(() => {
+    if (activeTab === 'shell') setShellVisited(true);
+  }, [activeTab]);
+
   const displayName = overrideName ?? agent.display_name ?? agent.short_id;
 
   return (
@@ -308,14 +318,23 @@ export default function AgentPanel({
             onMeshChanged={onMeshChanged}
           />
         )}
-        {activeTab === 'shell' && (
-          <ShellTab
-            agent={agent}
-            isActive={isActive}
-            disabled={shellDisabled}
-            apiAddress={apiAddress}
-            onDisabled={() => handleCapUpdate({ shell: false })}
-          />
+        {shellVisited && (
+          // Wrapper carries the shell's full-bleed flex sizing and the
+          // display:none hide; ShellTab itself never unmounts on tab switch.
+          // isActive is gated on the tab being visible too, so ShellTab's
+          // refit effect fires when the operator returns to the tab.
+          <div
+            className="flex min-h-0 flex-1 flex-col"
+            style={activeTab === 'shell' ? undefined : { display: 'none' }}
+          >
+            <ShellTab
+              agent={agent}
+              isActive={isActive && activeTab === 'shell'}
+              disabled={shellDisabled}
+              apiAddress={apiAddress}
+              onDisabled={() => handleCapUpdate({ shell: false })}
+            />
+          </div>
         )}
         {activeTab === 'files' && (
           <FilesTab
@@ -325,7 +344,11 @@ export default function AgentPanel({
           />
         )}
         {activeTab === 'ping' && (
-          <PingTab agent={agent} onDisabled={() => handleCapUpdate({ icmp: false })} />
+          <PingTab
+            agent={agent}
+            isActive={isActive}
+            onDisabled={() => handleCapUpdate({ icmp: false })}
+          />
         )}
       </div>
     </aside>
