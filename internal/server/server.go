@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/postalsys/muti-metroo-manager/internal/agentprobe"
 	"github.com/postalsys/muti-metroo-manager/internal/downloads"
@@ -112,6 +113,11 @@ func New(opts Options) (*http.Server, SeedHealthFunc) {
 	srv := &http.Server{
 		Addr:    opts.Addr,
 		Handler: instrumentMiddleware(inst, accessLog(logger, mux)),
+		// Slowloris hardening. WriteTimeout is deliberately unset: it
+		// would kill hijacked WebSocket relays (shell, ping) and long
+		// file-transfer streams mid-flight.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 	return srv, hc.seed
 }
@@ -128,7 +134,14 @@ func MetricsServer(addr string, reg *metrics.Registry) *http.Server {
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/metrics", http.StatusFound)
 	}))
-	return &http.Server{Addr: addr, Handler: mux}
+	// Same Slowloris hardening as the main listener; no WriteTimeout
+	// for consistency (a huge /metrics exposition must not be cut off).
+	return &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 }
 
 // settingsHandler serves GET (read) and PUT (replace) on /api/settings.
