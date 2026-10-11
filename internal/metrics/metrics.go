@@ -240,8 +240,8 @@ func (h *Histogram) Observe(labels map[string]string, v float64) {
 	s.count.Add(1)
 }
 
-// WriteTo renders every registered metric in Prometheus text format.
-func (r *Registry) WriteTo(w io.Writer) {
+// Render writes every registered metric in Prometheus text format.
+func (r *Registry) Render(w io.Writer) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

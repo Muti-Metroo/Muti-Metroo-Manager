@@ -114,6 +114,6 @@ func metricsHandler(reg *metrics.Registry) http.Handler {
 		}
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		reg.WriteTo(w)
+		reg.Render(w)
 	})
 }
