@@ -138,9 +138,9 @@ export default function DnsHostsTab({ canSignManagement, onGoToTlds }: DnsHostsT
     <>
       <div className="ui-hint">
         Mesh hosts map DNS-style names (e.g. <code>target-11.{placeholderTld}</code>) to IPv4 / IPv6
-        addresses. Mutiauk pulls this list and serves it from a local DNS resolver, so queries
-        for matching names resolve to the configured IP and route through the mesh. This agent
-        handles names ending with:{' '}
+        addresses. Mutiauk pulls this list and serves it from a local DNS resolver, so queries for
+        matching names resolve to the configured IP and route through the mesh. This agent handles
+        names ending with:{' '}
         {suffixes.length === 0 ? (
           <em>(none configured)</em>
         ) : (

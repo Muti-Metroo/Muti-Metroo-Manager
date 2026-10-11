@@ -115,10 +115,10 @@ export default function SettingsDialog({
         <DialogHeader title="Muti Metroo Manager settings" icon="icon-[tabler--settings]" />
         <div className="ui-dialog-body space-y-4">
           <p className="text-muted">
-            Override the advertised Muti Metroo agent API and SOCKS5 addresses shown by the UI. These are{' '}
-            <strong>display-only</strong> — the manager still proxies to whichever agent URL was
-            passed via <code className="bg-base-200 rounded px-1 font-mono">-agent</code>; this
-            dialog does not change which agent the manager connects to.
+            Override the advertised Muti Metroo agent API and SOCKS5 addresses shown by the UI.
+            These are <strong>display-only</strong> — the manager still proxies to whichever agent
+            URL was passed via <code className="bg-base-200 rounded px-1 font-mono">-agent</code>;
+            this dialog does not change which agent the manager connects to.
           </p>
 
           <div className="space-y-1">

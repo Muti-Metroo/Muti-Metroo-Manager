@@ -47,7 +47,11 @@ const BINARY_GROUPS: BinaryGroup[] = [
     subtitle: 'Run a Muti Metroo node on your machine.',
     configurable: true,
   },
-  { id: 'agent-dll', title: 'Muti Metroo Agent DLL', subtitle: 'Embeddable Windows library variant.' },
+  {
+    id: 'agent-dll',
+    title: 'Muti Metroo Agent DLL',
+    subtitle: 'Embeddable Windows library variant.',
+  },
   {
     id: 'entry',
     title: 'Mutiauk',

@@ -1247,8 +1247,8 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
           {truncated && (
             <div className="ui-error-wrap">
               <div className="ui-hint">
-                Showing {truncated.shown} of {truncated.total} entries. The rest was dropped at
-                Muti Metroo Manager's 100,000-entry safety cap.
+                Showing {truncated.shown} of {truncated.total} entries. The rest was dropped at Muti
+                Metroo Manager's 100,000-entry safety cap.
               </div>
             </div>
           )}

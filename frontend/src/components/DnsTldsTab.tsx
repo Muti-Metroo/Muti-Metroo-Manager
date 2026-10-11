@@ -97,9 +97,9 @@ export default function DnsTldsTab({ canSignManagement }: DnsTldsTabProps) {
     <>
       <div className="ui-hint">
         TLD suffixes are the trailing labels every mesh-host name must end with (e.g.{' '}
-        <code>.mesh</code>, <code>.muti-metroo.alt</code>). Single-label and multi-level suffixes are both
-        valid. Removing a suffix that still has registered hosts is rejected — clear those hosts
-        first.
+        <code>.mesh</code>, <code>.muti-metroo.alt</code>). Single-label and multi-level suffixes
+        are both valid. Removing a suffix that still has registered hosts is rejected — clear those
+        hosts first.
       </div>
       {!canMutate && (
         <div className="ui-hint">

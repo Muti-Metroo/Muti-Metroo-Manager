@@ -247,8 +247,8 @@ function StepSocks5({
     <>
       <h3 className="m-0 text-sm font-semibold">SOCKS5 proxy</h3>
       <p className="text-muted m-0">
-        Entry forwards all captured traffic to a SOCKS5 endpoint exposed by a Muti Metroo agent. Pick an
-        agent from the mesh, or enter an address manually.
+        Entry forwards all captured traffic to a SOCKS5 endpoint exposed by a Muti Metroo agent.
+        Pick an agent from the mesh, or enter an address manually.
       </p>
 
       {agents.length > 0 && (
@@ -508,8 +508,8 @@ function StepReview({
     <>
       <h3 className="m-0 text-sm font-semibold">Review & download</h3>
       <p className="text-muted m-0">
-        Save this to <code>/etc/mutiauk/config.yaml</code> on the target host, then run the
-        binary directly or install it as a system service.
+        Save this to <code>/etc/mutiauk/config.yaml</code> on the target host, then run the binary
+        directly or install it as a system service.
       </p>
       <div className="flex gap-2">
         <button className="btn btn-sm btn-primary" type="button" onClick={onDownload}>

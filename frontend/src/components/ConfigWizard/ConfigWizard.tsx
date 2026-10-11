@@ -564,8 +564,8 @@ function StepTls({
     <>
       <h3 className="m-0 text-sm font-semibold">TLS</h3>
       <p className="text-muted m-0">
-        Muti Metroo adds an E2E encryption layer on top of TLS, so self-signed certs are secure. Strict
-        TLS with a shared CA is optional hardening.
+        Muti Metroo adds an E2E encryption layer on top of TLS, so self-signed certs are secure.
+        Strict TLS with a shared CA is optional hardening.
       </p>
       <div className="flex flex-col gap-2">
         <label className="flex cursor-pointer items-start gap-2">
