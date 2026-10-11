@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Launchd user-agent definition for Muti Metroo Manager.
+
+  Install:
+    cp contrib/launchd/com.muti-metroo-manager.plist ~/Library/LaunchAgents/
+    # edit the paths in <ProgramArguments> and <WorkingDirectory> if your
+    # binary lives somewhere other than ~/Library/Application Support/Muti-Metroo-Manager
+    launchctl load ~/Library/LaunchAgents/com.muti-metroo-manager.plist
+
+  Reload after a binary update:
+    cp build/muti-metroo-manager "$HOME/Library/Application Support/Muti-Metroo-Manager/muti-metroo-manager"
+    launchctl kickstart -k gui/$(id -u)/com.muti-metroo-manager
+
+  The plist intentionally pins -addr to 127.0.0.1 so the management UI
+  is only reachable on loopback. If you need it on the LAN, put it
+  behind a reverse proxy with TLS terminated there rather than flipping
+  this to ":3000".
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.muti-metroo-manager</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/CHANGE_ME/Library/Application Support/Muti-Metroo-Manager/muti-metroo-manager</string>
+        <string>-addr</string>
+        <string>127.0.0.1:3090</string>
+        <string>-agent</string>
+        <string>http://127.0.0.1:8080</string>
+    </array>
+
+    <!-- Pinning WorkingDirectory makes muti-metroo-manager.db / muti-metroo-manager.lock
+         land in a known place no matter how the agent is launched. -->
+    <key>WorkingDirectory</key>
+    <string>/Users/CHANGE_ME/Library/Application Support/Muti-Metroo-Manager</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep alive across crashes. ThrottleInterval keeps a crash-loop
+         from hammering the system; muti-metroo-manager's startup probes are
+         cheap so 5s is plenty of headroom. -->
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <!-- Logs: separate stdout/stderr so the multi-line startup banner
+         (stderr) is easy to grep without mixing in access-log JSON. -->
+    <key>StandardOutPath</key>
+    <string>/Users/CHANGE_ME/Library/Logs/muti-metroo-manager.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/CHANGE_ME/Library/Logs/muti-metroo-manager.err.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <!-- Optional: pass METROO_MANAGER_AGENT_TOKEN via the environment so
+         the bearer token never appears in argv (visible to ps).
+         Uncomment and set if your agent requires authentication. -->
+    <!--
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>METROO_MANAGER_AGENT_TOKEN</key>
+        <string>your-token-here</string>
+    </dict>
+    -->
+</dict>
+</plist>

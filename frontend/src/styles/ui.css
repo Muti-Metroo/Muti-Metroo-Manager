@@ -1,0 +1,515 @@
+/*
+ * Shared app components.
+ *
+ * FlyonUI covers the standard controls (btn, input, select, table, badge,
+ * alert, card, tabs), which the markup uses directly. This file holds only
+ * the handful of patterns FlyonUI has no equivalent for, or where React owns
+ * the behaviour that FlyonUI would otherwise drive from its own runtime JS.
+ *
+ * Keep it small. Anything expressible as utility classes belongs in the
+ * markup, not here.
+ */
+
+@layer components {
+  /* ---------------------------------------------------------------------
+   * Dialogs
+   *
+   * FlyonUI's .modal is driven by its overlay runtime (data-overlay targets,
+   * open/close classes). React mounts and unmounts these dialogs instead, so
+   * they use a plain backdrop plus a card surface and keep FlyonUI's tokens
+   * for radius, border and elevation.
+   * ------------------------------------------------------------------- */
+  .ui-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    /* No backdrop-filter: the topology map animates continuously behind
+     * these dialogs, so a blur would be recomputed over the whole viewport
+     * every frame the dialog is open. A denser scrim reads the same. */
+    background: rgb(0 0 0 / 0.65);
+  }
+
+  .ui-dialog {
+    display: flex;
+    width: 100%;
+    max-width: 32rem;
+    max-height: min(85vh, 48rem);
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+    box-shadow: 0 24px 48px -12px rgb(0 0 0 / 0.5);
+  }
+
+  .ui-dialog-header {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-hairline);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .ui-dialog-body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  .ui-dialog-footer {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  /* ---------------------------------------------------------------------
+   * Tab-body states
+   *
+   * Every agent-panel tab and major tab shows the same four states, so they
+   * are named rather than repeated as utility strings in ~20 components.
+   * ------------------------------------------------------------------- */
+  .ui-empty {
+    padding: 1rem;
+    text-align: center;
+    font-style: italic;
+    color: var(--color-muted);
+  }
+
+  .ui-loading {
+    font-style: italic;
+    color: var(--color-muted);
+  }
+
+  .ui-disabled-msg {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--color-muted);
+  }
+
+  .ui-error {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid color-mix(in oklab, var(--color-error) 35%, transparent);
+    border-radius: var(--radius-field);
+    background-color: color-mix(in oklab, var(--color-error) 12%, transparent);
+    color: var(--color-error);
+  }
+
+  .ui-error-wrap {
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* Explanatory block above a form: what this control does and its caveats. */
+  .ui-hint {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-200);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--color-muted);
+  }
+
+  /* ---------------------------------------------------------------------
+   * Key/value listings
+   *
+   * The info-style panels are all "label on the left, monospace value on the
+   * right that must be able to wrap without pushing the label around".
+   * ------------------------------------------------------------------- */
+  .ui-kv {
+    display: grid;
+    grid-template-columns: fit-content(9rem) minmax(0, 1fr);
+    column-gap: 1rem;
+    row-gap: 0.25rem;
+    align-items: baseline;
+  }
+
+  .ui-kv > dt {
+    color: var(--color-muted);
+  }
+
+  .ui-kv > dd {
+    margin: 0;
+    min-width: 0;
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  /* A titled block inside a scrolling panel body. */
+  .ui-section {
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+  }
+
+  .ui-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-hairline);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  /* ---------------------------------------------------------------------
+   * Managed-list rows
+   *
+   * Routes, peers, listeners, forwards and DNS hosts all render the same
+   * shape: a header hint, an inline add form, then a list of rows with a
+   * monospace identifier and a trailing action. Named rather than inlined
+   * because five agent-panel tabs share it verbatim.
+   * ------------------------------------------------------------------- */
+  .routes-tab {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .routes-add-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .routes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .routes-list-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-field);
+    background-color: var(--color-base-100);
+  }
+
+  /* Statically configured entries: present but not operator-editable. */
+  .routes-list-item-static {
+    border-style: dashed;
+    background-color: var(--color-base-200);
+  }
+
+  .routes-list-item-inbound {
+    border-color: color-mix(in oklab, var(--color-success) 30%, transparent);
+  }
+
+  .routes-network,
+  .peers-address,
+  .forwards-key {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  .routes-network {
+    color: var(--role-exit);
+  }
+
+  .peers-address {
+    color: var(--role-ingress);
+  }
+
+  .forwards-key {
+    color: var(--role-forward-ingress);
+  }
+
+  .routes-list-item-static .routes-network,
+  .routes-list-item-static .forwards-key {
+    color: var(--color-muted);
+  }
+
+  .routes-network-wrap {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .routes-network-wrap .routes-network {
+    flex: initial;
+  }
+
+  .routes-comment,
+  .routes-metric {
+    font-size: 0.6875rem;
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+  }
+
+  /* Per-route egress bindings, shown under the CIDR when set. */
+  .routes-source-ip,
+  .routes-interface {
+    width: fit-content;
+    overflow-wrap: anywhere;
+  }
+
+  .routes-source-ip {
+    color: var(--color-accent);
+  }
+
+  .routes-interface {
+    color: var(--color-warning);
+  }
+
+  .routes-static {
+    margin-top: 0.5rem;
+  }
+
+  .routes-static-header {
+    margin-bottom: 0.4rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .routes-badge-static,
+  .routes-badge-inbound,
+  .routes-badge-attached,
+  .peers-transport {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .routes-badge-static {
+    color: var(--color-muted);
+  }
+
+  .routes-badge-inbound {
+    color: var(--color-success);
+  }
+
+  .routes-badge-attached,
+  .peers-transport {
+    color: var(--role-ingress);
+  }
+
+  .peers-remote-id {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-muted);
+  }
+
+  /* ---------------------------------------------------------------------
+   * Chips, frames and popovers
+   *
+   * Three shapes the markup reaches for constantly. Each was being spelled
+   * out per call site with slightly different numbers, which is exactly the
+   * drift a named class prevents.
+   * ------------------------------------------------------------------- */
+
+  /* A small monospace token tinted from its own text colour, so a caller
+   * only picks `color`. Used for CIDRs, forward keys, transports and the
+   * per-route egress bindings. */
+  .ui-chip {
+    display: inline-block;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid color-mix(in oklab, currentColor 32%, transparent);
+    border-radius: var(--radius-selector);
+    background-color: color-mix(in oklab, currentColor 12%, transparent);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+  }
+
+  /* Scroll container for a `table table-sm table-pin-rows`. The frame has to
+   * be the scroller for table-pin-rows to stick, which is why the two always
+   * travel together. */
+  .ui-table-frame {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-box);
+  }
+
+  /* Floating panel anchored under its trigger: menus, comboboxes and the
+   * agent-search results. The caller positions it and sets any width. */
+  .ui-popover {
+    position: absolute;
+    z-index: 50;
+    overflow-y: auto;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+    padding: 0.25rem;
+    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.45);
+  }
+
+  /* ---------------------------------------------------------------------
+   * Config wizards
+   *
+   * The wizard shell is .ui-dialog plus the two-column body below; see
+   * components/wizard/WizardShell.tsx, which both wizards render. Only the
+   * step rail and pane need rules of their own.
+   * ------------------------------------------------------------------- */
+  .wizard-body {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-columns: 12.5rem 1fr;
+    overflow: hidden;
+  }
+
+  .wizard-stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    border-right: 1px solid var(--color-hairline);
+    background-color: var(--color-base-200);
+    padding: 0.75rem 0.5rem;
+  }
+
+  .wizard-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-field);
+    padding: 0.4rem 0.6rem;
+    text-align: start;
+    cursor: pointer;
+    color: var(--color-muted);
+    transition:
+      background-color 0.12s,
+      color 0.12s;
+  }
+
+  .wizard-step:hover {
+    background-color: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+  }
+
+  .wizard-step-active {
+    background-color: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
+  .wizard-step-done {
+    color: var(--color-base-content);
+  }
+
+  .wizard-step-num {
+    display: inline-flex;
+    height: 1.375rem;
+    width: 1.375rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
+    border-radius: 9999px;
+    background-color: var(--color-base-100);
+    font-size: 0.6875rem;
+  }
+
+  .wizard-step-active .wizard-step-num {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+  }
+
+  .wizard-step-done .wizard-step-num {
+    border-color: var(--color-success);
+    background-color: var(--color-success);
+    color: var(--color-success-content);
+  }
+
+  .wizard-step-label {
+    flex: 1;
+  }
+
+  .wizard-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    overflow-y: auto;
+    padding: 1rem 1.2rem;
+  }
+
+  /* A single labelled control: label, input, then hint or error. */
+  .wizard-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .wizard-peer-picker {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .wizard-peer-available-row,
+  .wizard-peer-row {
+    display: flex;
+    gap: 0.4rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-field);
+    background-color: var(--color-base-200);
+    padding: 0.5rem 0.6rem;
+  }
+
+  .wizard-peer-available-row {
+    align-items: center;
+  }
+
+  .wizard-peer-row {
+    flex-direction: column;
+  }
+
+  .wizard-peer-available-row-offline {
+    opacity: 0.7;
+  }
+
+  .wizard-peer-available-row-selected {
+    opacity: 0.55;
+  }
+
+  /* ---------------------------------------------------------------------
+   * Terminal
+   *
+   * xterm paints its own DOM; this only supplies the surrounding frame and
+   * the palette bridge, since xterm reads colours from its JS theme option
+   * (see ShellTab) rather than from CSS.
+   * ------------------------------------------------------------------- */
+  .shell-terminal {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    padding: 0.5rem;
+    /* Same token ShellTab hands to xterm, so the frame and the canvas cannot
+     * drift apart. */
+    background-color: var(--color-terminal);
+  }
+
+  .shell-terminal .xterm {
+    height: 100%;
+  }
+}

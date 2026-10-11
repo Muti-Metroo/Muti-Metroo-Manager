@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <script>
+      // Pre-paint theme resolution: without this the document renders one
+      // frame in the markup default before React mounts and corrects it.
+      // Must stay ABOVE the stylesheet link: an inline script is blocked on
+      // any stylesheet that precedes it, which would defer this past first
+      // paint and reintroduce the flash it exists to prevent.
+      // This is the only place the theme is resolved; src/util/theme.ts reads
+      // the attribute back rather than re-deriving it. The storage read is
+      // guarded on its own so a blocked localStorage still falls through to
+      // the OS preference rather than pinning the markup default.
+      // The 'mutiMetrooTheme' key is duplicated in theme.ts, keep them in step.
+      (function () {
+        var stored = null;
+        try {
+          stored = localStorage.getItem('mutiMetrooTheme');
+        } catch (e) {
+          /* private mode / storage disabled: fall through to the OS choice */
+        }
+        var theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light'
+              : 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+    <title>Muti Metroo Manager</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Auto-format staged JS/TS/JSON/CSS under frontend/ with Prettier before commit.
+# Enable with: make hooks   (sets core.hooksPath to .githooks)
+# Kept bash-3.2 compatible (macOS default) — no mapfile.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+prettier="$repo_root/frontend/node_modules/.bin/prettier"
+
+if [ ! -x "$prettier" ]; then
+  echo "pre-commit: prettier not installed (run 'cd frontend && npm ci'); skipping format." >&2
+  exit 0
+fi
+
+# Staged, added/copied/modified files under frontend/ with a formattable extension.
+files=()
+while IFS= read -r f; do
+  [ -n "$f" ] && files+=("$f")
+done < <(git diff --cached --name-only --diff-filter=ACM | grep -E '^frontend/.*\.(ts|tsx|js|jsx|json|css|mjs)$' || true)
+
+if [ ${#files[@]} -eq 0 ]; then
+  exit 0
+fi
+
+# Prettier config + ignore live in frontend/, so run it from there with
+# paths made relative to frontend/.
+rel=()
+for f in "${files[@]}"; do
+  rel+=("${f#frontend/}")
+done
+
+( cd "$repo_root/frontend" && "$prettier" --write --ignore-unknown "${rel[@]}" )
+
+# Re-stage whatever prettier rewrote.
+git add -- "${files[@]}"

@@ -1,0 +1,134 @@
+/*
+ * App shell geometry.
+ *
+ * Everything here is driven by --agent-panel-width, a custom property that
+ * usePanelWidth writes on <html> during a drag so the 60Hz pointermove loop
+ * never re-renders React. Tailwind utilities cannot read that variable for
+ * both a margin and a right offset, so the shell keeps hand-written rules;
+ * all colors still come from the theme tokens in app.css.
+ */
+
+@layer components {
+  /* Fills the viewport exactly: the header and footer are fixed-height rails
+   * and only .app-main scrolls, so the footer status line stays visible on a
+   * wall-mounted dashboard instead of being pushed below the fold. */
+  .app-shell {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* The scrolling work area between the header and the footer. */
+  .app-main {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .app-main.panel-open {
+    margin-right: var(--agent-panel-width, 640px);
+    transition: margin-right 0.2s ease-out;
+  }
+
+  /* Suppress the transition during a live drag so the resize tracks the
+   * pointer 1:1 instead of lagging by 200ms. */
+  .app-main.panel-resizing {
+    transition: none !important;
+  }
+
+  .agent-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 900;
+    display: flex;
+    height: 100vh;
+    width: var(--agent-panel-width, 640px);
+    flex-direction: column;
+    border-left: 1px solid var(--color-hairline);
+    background-color: var(--color-base-100);
+    box-shadow: -8px 0 24px -12px rgb(0 0 0 / 0.45);
+  }
+
+  /* Vertical drag handle straddling the panel's left edge. 12px hit zone for
+   * reliable finger/mouse targeting; the visible line is 3px centered. The
+   * z-index sits above .agent-panel so the handle wins pointer events along
+   * the shared boundary. */
+  .agent-panel-divider {
+    position: fixed;
+    top: 0;
+    right: var(--agent-panel-width, 640px);
+    z-index: 901;
+    display: flex;
+    height: 100vh;
+    width: 12px;
+    transform: translateX(50%);
+    cursor: col-resize;
+    align-items: stretch;
+    justify-content: center;
+    background: transparent;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .agent-panel-divider-line {
+    width: 3px;
+    background: transparent;
+    transition: background-color 0.12s ease-out;
+  }
+
+  .agent-panel-divider:hover .agent-panel-divider-line,
+  body.panel-dragging .agent-panel-divider-line {
+    background-color: var(--color-primary);
+  }
+
+  /* While dragging, freeze the cursor and disable selection globally so the
+   * pointer does not flicker as it crosses xterm canvases, links or inputs. */
+  body.panel-dragging,
+  body.panel-dragging * {
+    cursor: col-resize !important;
+  }
+
+  body.panel-dragging {
+    user-select: none !important;
+  }
+
+  .agent-panel-slide-in {
+    animation: agent-panel-slide-in 0.18s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .agent-panel-slide-in {
+      animation: none;
+    }
+    .app-main.panel-open {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .agent-panel {
+      width: 100%;
+    }
+    .app-main.panel-open {
+      margin-right: 0;
+    }
+    /* The panel covers the full viewport here, so the handle would float
+     * inside the panel content with nothing to resize. */
+    .agent-panel-divider {
+      display: none;
+    }
+  }
+}
+
+@keyframes agent-panel-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

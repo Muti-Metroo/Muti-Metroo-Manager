@@ -1,0 +1,78 @@
+# Muti Metroo Manager — systemd unit for Linux deployments.
+#
+# Install:
+#   sudo cp contrib/systemd/muti-metroo-manager.service /etc/systemd/system/
+#   sudo cp build/muti-metroo-manager /usr/local/bin/muti-metroo-manager
+#   sudo install -d -m 750 -o muti-metroo-manager -g muti-metroo-manager /var/lib/muti-metroo-manager /etc/muti-metroo-manager
+#   sudo install -m 600 -o muti-metroo-manager -g muti-metroo-manager /dev/stdin /etc/muti-metroo-manager/token <<<"YOUR_TOKEN"
+#   sudo /usr/local/bin/muti-metroo-manager config init /etc/muti-metroo-manager/config.toml
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now muti-metroo-manager
+#
+# Verify:
+#   sudo systemctl status muti-metroo-manager
+#   curl -s http://127.0.0.1:3000/healthz | jq .
+#
+# Pre-start validation (`muti-metroo-manager check`) runs every restart so a
+# misconfigured deploy fails before the listener comes up. Hardening
+# uses systemd's standard sandbox primitives — see systemd.exec(5).
+
+[Unit]
+Description=Muti Metroo Manager management UI
+Documentation=https://github.com/Muti-Metroo/Muti-Metroo-Manager/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Dedicated unprivileged user. `useradd --system --no-create-home muti-metroo-manager`
+# before enabling, then chown /var/lib/muti-metroo-manager and /etc/muti-metroo-manager/token.
+User=muti-metroo-manager
+Group=muti-metroo-manager
+
+# Validate config and probe the upstream agent before flipping the
+# unit to "running". Exit 0 = go; exit 1 = fail-fast (systemd marks
+# the unit as failed without taking the listener up).
+ExecStartPre=/usr/local/bin/muti-metroo-manager check -config /etc/muti-metroo-manager/config.toml
+
+ExecStart=/usr/local/bin/muti-metroo-manager -config /etc/muti-metroo-manager/config.toml
+
+Restart=on-failure
+RestartSec=5s
+
+# Reload-on-SIGHUP isn't supported yet; stop+start covers it.
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+# --- Hardening (defence-in-depth) ---
+
+# No new capabilities, no kernel module loading, no privilege escalation.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+# Only the data directory needs to be writable. Everything else stays
+# read-only because of ProtectSystem=strict + this allow-list.
+ReadWritePaths=/var/lib/muti-metroo-manager
+WorkingDirectory=/var/lib/muti-metroo-manager
+
+# Resource limits: enough headroom for the WebSocket shell + file
+# downloads, but not enough to wedge a small VM if something is wrong.
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target
