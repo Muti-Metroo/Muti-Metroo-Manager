@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.41](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.40...metroo-manager-v0.2.41) (2026-10-11)
+
+
+### Miscellaneous Chores
+
+* update repository references to Muti-Metroo org ([cbd938a](https://github.com/Muti-Metroo/Muti-Metroo-Manager/commit/cbd938ac3242700c7630ae0da7ea996e4d844fb1))
+
 ## [0.2.40](https://github.com/postalsys/Muti-Metroo-Manager/compare/metroo-manager-v0.2.39...metroo-manager-v0.2.40) (2026-10-11)
 
 
