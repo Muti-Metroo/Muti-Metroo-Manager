@@ -173,6 +173,12 @@ Reference unit files live in `contrib/`:
   paths and (optional) the bearer token in `EnvironmentVariables`.
 - `contrib/openrc/muti-metroo-manager` — OpenRC for Alpine / Gentoo.
 
+On SIGINT/SIGTERM the manager drains in-flight HTTP requests with a 15s
+grace period (`srv.Shutdown`). Note that hijacked WebSocket connections
+(remote shell, ICMP sessions) are not tracked by `http.Server.Shutdown`,
+so live shells and in-progress file transfers are still cut when the
+process exits.
+
 ## Development
 
 Run the Go backend and Vite dev server in separate terminals:

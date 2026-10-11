@@ -141,16 +141,16 @@ func runServer(args []string) int {
 		SoundsLocked: cfg.NoSounds,
 	})
 
-	if metricsReg != nil {
-		mSrv := server.MetricsServer(cfg.MetricsAddr, metricsReg)
+	metricsSrv := server.MetricsServer(cfg.MetricsAddr, metricsReg)
+	metricsErrCh := make(chan error, 1)
+	if metricsSrv != nil {
 		go func() {
 			logger.Info("metrics listener", slog.String("addr", cfg.MetricsAddr))
-			if err := mSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger.Error("metrics server error", slog.String("err", err.Error()))
-			}
+			metricsErrCh <- metricsSrv.ListenAndServe()
 		}()
 	}
 
+	serveErrCh := make(chan error, 1)
 	go func() {
 		var probe agentprobe.Result
 		select {
@@ -171,18 +171,56 @@ func runServer(args []string) int {
 			bundleDisabled: bundleDisabled,
 			probe:          probe,
 		})
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("server error", slog.String("err", err.Error()))
-			os.Exit(1)
-		}
+		serveErrCh <- srv.ListenAndServe()
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	logger.Info("shutting down")
+
+	// A serve error before any signal (e.g. address already in use) is a
+	// startup failure: report it and exit non-zero through the normal
+	// return path so the deferred store/lock cleanup runs.
+	select {
+	case err := <-serveErrCh:
+		if err != nil && err != http.ErrServerClosed {
+			logger.Error("server error", slog.String("err", err.Error()))
+			return 1
+		}
+		return 0
+	case err := <-metricsErrCh:
+		if err != nil && err != http.ErrServerClosed {
+			logger.Error("metrics server error", slog.String("err", err.Error()))
+			return 1
+		}
+		return 0
+	case sig := <-quit:
+		logger.Info("shutting down", slog.String("signal", sig.String()))
+	}
+
+	// Bounded graceful shutdown: in-flight HTTP requests get up to
+	// shutdownTimeout to finish. Note that http.Server.Shutdown does not
+	// track hijacked connections, so live WebSocket relays (remote
+	// shells, ICMP sessions) and streaming file downloads are still cut
+	// when their owning handler returns or the process exits — the
+	// graceful window only covers ordinary request/response traffic.
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("server shutdown", slog.String("err", err.Error()))
+		return 1
+	}
+	if metricsSrv != nil {
+		if err := metricsSrv.Shutdown(ctx); err != nil {
+			logger.Error("metrics server shutdown", slog.String("err", err.Error()))
+			return 1
+		}
+	}
 	return 0
 }
+
+// shutdownTimeout bounds how long SIGINT/SIGTERM waits for in-flight
+// HTTP requests to drain before the process exits anyway.
+const shutdownTimeout = 15 * time.Second
 
 // bannerInputs is the cohesive bundle of state the startup banner
 // renders — pulling them into a struct lets the caller assemble the
