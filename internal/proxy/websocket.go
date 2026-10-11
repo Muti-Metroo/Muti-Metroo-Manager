@@ -64,9 +64,11 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request, agentPat
 		logger.Debug("ws relay", slog.String("dir", direction), slog.String("path", agentPath), slog.String("err", err.Error()))
 	}
 
-	// Agent → Client
+	// Agent → Client. Closing clientConn on exit unblocks the
+	// client→agent read loop below when the agent goes away first.
 	go func() {
 		defer close(done)
+		defer clientConn.Close()
 		for {
 			msgType, msg, err := agentConn.ReadMessage()
 			if err != nil {
@@ -93,5 +95,10 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request, agentPat
 		}
 	}
 
+	// Closing agentConn unblocks the agent→client goroutine's read when
+	// the client went away first; without this the handler parks on
+	// <-done forever and leaks both connections. The deferred Closes
+	// above make the second close a harmless no-op error.
+	agentConn.Close()
 	<-done
 }
