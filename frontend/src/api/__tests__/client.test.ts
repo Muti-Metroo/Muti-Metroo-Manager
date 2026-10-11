@@ -165,3 +165,82 @@ describe('probeAgentPeer', () => {
     expect(resp.error).toBe('timeout');
   });
 });
+
+describe('manager auth', () => {
+  function mockFetchWithHeaders(response: { status: number; body: unknown; wwwAuth?: string }) {
+    const fn = vi.fn(
+      async () =>
+        ({
+          ok: response.status >= 200 && response.status < 300,
+          status: response.status,
+          headers: {
+            get: (name: string) =>
+              name === 'WWW-Authenticate' ? (response.wwwAuth ?? null) : null,
+          },
+          async json() {
+            return response.body;
+          },
+          async text() {
+            return JSON.stringify(response.body);
+          },
+        }) as unknown as Response,
+    );
+    vi.stubGlobal('fetch', fn);
+    return fn;
+  }
+
+  beforeEach(() => {
+    clearToken();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('dispatches manager-auth-required on a manager-realm 401 and keeps the agent token', async () => {
+    setToken('agent-token');
+    mockFetchWithHeaders({
+      status: 401,
+      body: { error: 'manager authentication required', error_code: 'manager_auth_required' },
+      wwwAuth: 'Bearer realm="muti-metroo-manager"',
+    });
+    const events: string[] = [];
+    window.addEventListener('manager-auth-required', () => events.push('manager'));
+    window.addEventListener('auth-required', () => events.push('agent'));
+
+    const { getSettings } = await import('../client');
+    await expect(getSettings()).rejects.toThrow('Manager authentication required');
+    expect(events).toEqual(['manager']);
+    // The agent token must survive a manager 401 — it is a different credential.
+    const { getToken } = await import('../client');
+    expect(getToken()).toBe('agent-token');
+  });
+
+  it('dispatches auth-required on a plain 401 (agent-side) as before', async () => {
+    setToken('agent-token');
+    mockFetchWithHeaders({ status: 401, body: { error: 'unauthorized' } });
+    const events: string[] = [];
+    window.addEventListener('manager-auth-required', () => events.push('manager'));
+    window.addEventListener('auth-required', () => events.push('agent'));
+
+    const { getSettings } = await import('../client');
+    await expect(getSettings()).rejects.toThrow('Authentication required');
+    expect(events).toEqual(['agent']);
+  });
+
+  it('managerLogin POSTs the token and resolves on 204', async () => {
+    const fn = mockFetchWithHeaders({ status: 204, body: null });
+    const { managerLogin } = await import('../client');
+    await managerLogin('manager-token');
+    const [url, init] = fn.mock.calls[0] as unknown as FetchArgs;
+    expect(url).toBe('/api/auth/login');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ token: 'manager-token' });
+  });
+
+  it('managerLogin rejects on 401', async () => {
+    mockFetchWithHeaders({ status: 401, body: { error: 'nope' } });
+    const { managerLogin } = await import('../client');
+    await expect(managerLogin('wrong')).rejects.toThrow('Invalid manager token');
+  });
+});

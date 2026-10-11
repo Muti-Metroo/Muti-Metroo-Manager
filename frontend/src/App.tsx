@@ -29,6 +29,7 @@ import {
   setToken,
   clearToken,
   getToken,
+  managerLogin,
 } from './api/client';
 import Header from './components/Header';
 import MetroMap from './components/MetroMap/MetroMap';
@@ -103,6 +104,7 @@ export default function App() {
     error?: string;
   } | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
+  const [managerAuthRequired, setManagerAuthRequired] = useState(false);
   const [configWizardOpen, setConfigWizardOpen] = useState(false);
   const [entryWizardOpen, setEntryWizardOpen] = useState(false);
 
@@ -330,6 +332,27 @@ export default function App() {
     window.addEventListener('auth-required', handler);
     return () => window.removeEventListener('auth-required', handler);
   }, []);
+
+  // Listen for manager-auth-required events — the manager's own gate,
+  // distinct from the agent token flow above. The manager gate wins
+  // when both fire: its 401s block every /api/* route, so there is no
+  // point asking for the agent token until the manager lets us through.
+  useEffect(() => {
+    const handler = () => setManagerAuthRequired(true);
+    window.addEventListener('manager-auth-required', handler);
+    return () => window.removeEventListener('manager-auth-required', handler);
+  }, []);
+
+  const handleManagerTokenSubmit = useCallback(
+    async (token: string): Promise<void> => {
+      // Exchanges the token for the manager's session cookie; throws on a
+      // wrong token so the dialog shows its error state.
+      await managerLogin(token);
+      setManagerAuthRequired(false);
+      refresh();
+    },
+    [refresh],
+  );
 
   const handleTokenSubmit = useCallback(
     async (token: string, persist: 'session' | 'long' = 'session'): Promise<void> => {
@@ -630,7 +653,16 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {authRequired && <TokenDialog onSubmit={handleTokenSubmit} />}
+      {managerAuthRequired ? (
+        <TokenDialog
+          title="Manager authentication required"
+          description="This Muti Metroo Manager instance requires its access token. Enter the manager token to continue."
+          showPersist={false}
+          onSubmit={handleManagerTokenSubmit}
+        />
+      ) : (
+        authRequired && <TokenDialog onSubmit={handleTokenSubmit} />
+      )}
       <Header agent={dashboard?.agent ?? null} />
       {sleepError && (
         <div className="mx-4 mt-2">

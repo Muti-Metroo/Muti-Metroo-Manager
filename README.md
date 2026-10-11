@@ -32,6 +32,42 @@ make build
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+Note: the default `-addr :3000` binds every interface, and the manager refuses
+to start on a non-loopback bind without an auth token — see
+[Authentication](#authentication). For a quick local run either pin the
+listener (`-addr 127.0.0.1:3000`) or set a token.
+
+## Authentication
+
+The manager can require its own access token for **all** `/api/*` routes —
+including `/api/proxy/*`, which carries remote shell and file transfer into
+the mesh. Set it with `-auth-token-file` (recommended) or the
+`METROO_MANAGER_AUTH_TOKEN` env var:
+
+```bash
+openssl rand -hex 32 > /etc/muti-metroo-manager/auth-token
+./build/muti-metroo-manager -addr :3000 -auth-token-file /etc/muti-metroo-manager/auth-token
+```
+
+With a token set, browsers see a login gate in the UI (the token is exchanged
+for an `HttpOnly`, `SameSite=Strict` session cookie via `POST /api/auth/login`),
+and API clients authenticate with `Authorization: Bearer <token>`. WebSocket
+upgrades are covered by the same cookie; non-browser WS clients may pass
+`?token=<token>` instead.
+
+Without a token the manager keeps working as before but logs a loud startup
+warning, and **refuses to bind a non-loopback address** unless you pass
+`-insecure-no-auth`. Running without a token means anyone who can reach the
+port has full control of the agent API — only do this on a loopback bind or
+behind an authenticating reverse proxy.
+
+The SPA is served same-origin, so the manager emits no CORS headers, and the
+WebSocket upgrader only accepts same-origin (or Origin-less, i.e. non-browser)
+upgrade requests. When deploying behind a reverse proxy, terminate TLS there
+and pin the manager to `127.0.0.1:3000` (or set `-auth-token-file`) — the
+login cookie is marked `Secure` automatically when the request arrives over
+HTTPS (`X-Forwarded-Proto: https`).
+
 ## Configuration
 
 Muti Metroo Manager reads its configuration from three layers — built-in
@@ -59,6 +95,9 @@ per-field provenance.
 | `-agent` | `http://127.0.0.1:8080` | Muti Metroo agent URL to proxy to |
 | `-agent-token` | — | Bearer token for agent API authentication. Visible via `/proc/<pid>/cmdline`; prefer `-agent-token-file` or `METROO_MANAGER_AGENT_TOKEN` |
 | `-agent-token-file` | — | File containing the bearer token (single line, trimmed). Recommended for production. |
+| `-auth-token` | — | Manager's own access token guarding all `/api/*` routes. Visible via `/proc/<pid>/cmdline`; prefer `-auth-token-file` or `METROO_MANAGER_AUTH_TOKEN` |
+| `-auth-token-file` | — | File containing the manager auth token (single line, trimmed). Recommended for production. |
+| `-insecure-no-auth` | `false` | Allow binding a non-loopback address with no manager auth token (dangerous) |
 | `-data-dir` | OS-appropriate¹ | Directory for `muti-metroo-manager.db` and the instance lock |
 | `-downloads-bundle` | next to binary | Path to `muti-metroo-downloads-bundle.zip`; an explicitly set path that does not exist is fatal |
 | `-no-downloads` | `false` | Disable the Downloads tab regardless of bundle presence |
@@ -79,7 +118,8 @@ backwards compatibility but logs a deprecation warning — use
 | Variable | Effect |
 |----------|--------|
 | `METROO_MANAGER_AGENT_TOKEN` | Bearer token sent to the agent |
-| `MUTI_METROO_TOKEN` | _Deprecated alias for the above; logs a warning on use._ |
+| `METROO_MANAGER_AUTH_TOKEN` | Manager's own access token guarding all `/api/*` routes |
+| `MUTI_METROO_TOKEN` | _Deprecated alias for `METROO_MANAGER_AGENT_TOKEN`; logs a warning on use._ |
 
 ### Example config file
 
@@ -91,12 +131,13 @@ muti-metroo-manager config init /etc/muti-metroo-manager/config.toml
 addr = "127.0.0.1:3000"
 agent = "https://mesh.example.com"
 agent_token_file = "/etc/muti-metroo-manager/token"
+auth_token_file = "/etc/muti-metroo-manager/auth-token"
 data_dir = "/var/lib/muti-metroo-manager"
 no_downloads = false
 ```
 
-Inline `agent_token` is intentionally rejected; use `agent_token_file`
-or the env var instead.
+Inline `agent_token`/`auth_token` are intentionally rejected; use the
+`_file` variants or the env vars instead.
 
 ### Observability
 

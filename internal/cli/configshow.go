@@ -57,7 +57,7 @@ func renderShow(res config.LoadResult, w io.Writer) {
 		val := fieldValue(res.Config, key)
 		src := res.Source[key]
 		comment := "# " + src
-		if key == "agent_token" {
+		if key == "agent_token" || key == "auth_token" {
 			if val != "" {
 				val = "<redacted>"
 			}
@@ -80,6 +80,12 @@ func fieldValue(cfg config.Config, key string) any {
 		return cfg.AgentToken
 	case "agent_token_file":
 		return cfg.AgentTokenFile
+	case "auth_token":
+		return cfg.AuthToken
+	case "auth_token_file":
+		return cfg.AuthTokenFile
+	case "insecure_no_auth":
+		return cfg.InsecureNoAuth
 	case "data_dir":
 		return cfg.DataDir
 	case "downloads_bundle":

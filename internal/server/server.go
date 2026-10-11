@@ -27,6 +27,12 @@ type Options struct {
 	Bundle     *downloads.Bundle
 	Version    string
 
+	// AuthToken, when non-empty, gates every /api/* route (including
+	// /api/proxy/*) behind a bearer token / session cookie — see
+	// auth.go. Empty disables the gate; cmd/manager only permits that
+	// on loopback binds or with -insecure-no-auth.
+	AuthToken string
+
 	// AgentProber, when non-nil, drives /healthz's agent_reachable
 	// field, refreshed at most every 5s.
 	AgentProber *agentprobe.Prober
@@ -79,22 +85,33 @@ func New(opts Options) (*http.Server, SeedHealthFunc) {
 			"1 when the upstream Muti Metroo agent answered the last health probe.",
 			nil, hc.reachableGauge)
 	}
-	mux.Handle("/api/proxy/", p)
-	mux.Handle("/api/settings", settingsHandler(opts.Store, logger, opts.SoundsLocked))
-	mux.Handle("/api/agent-meta", agentMetaListHandler(opts.Store))
-	mux.Handle("/api/agent-meta/", agentMetaItemHandler(opts.Store, logger))
-	mux.Handle("/api/networks", networksListHandler(opts.Store))
-	mux.Handle("/api/networks/", networkItemHandler(opts.Store, logger))
-	mux.Handle("/api/positions", positionsHandler(opts.Store, logger))
+
+	// Everything under /api/* sits behind the manager auth gate, with
+	// the single exception of the login endpoint — the gate's
+	// entrance. The SPA is same-origin, so no CORS headers are
+	// emitted at all: browsers enforce same-origin by default and
+	// non-browser clients don't need them.
+	api := http.NewServeMux()
+	api.Handle("/api/proxy/", p)
+	api.Handle("/api/settings", settingsHandler(opts.Store, logger, opts.SoundsLocked))
+	api.Handle("/api/agent-meta", agentMetaListHandler(opts.Store))
+	api.Handle("/api/agent-meta/", agentMetaItemHandler(opts.Store, logger))
+	api.Handle("/api/networks", networksListHandler(opts.Store))
+	api.Handle("/api/networks/", networkItemHandler(opts.Store, logger))
+	api.Handle("/api/positions", positionsHandler(opts.Store, logger))
 	if opts.Bundle != nil {
-		mux.Handle("/api/downloads/manifest", downloadsManifestHandler(opts.Bundle))
-		mux.Handle("/api/downloads/file/", downloadsFileHandler(opts.Bundle))
+		api.Handle("/api/downloads/manifest", downloadsManifestHandler(opts.Bundle))
+		api.Handle("/api/downloads/file/", downloadsFileHandler(opts.Bundle))
+	}
+	mux.Handle("/api/", authMiddleware(opts.AuthToken, api))
+	if opts.AuthToken != "" {
+		mux.Handle("/api/auth/login", loginHandler(opts.AuthToken))
 	}
 	mux.Handle("/", webui.Handler())
 
 	srv := &http.Server{
 		Addr:    opts.Addr,
-		Handler: corsMiddleware(instrumentMiddleware(inst, accessLog(logger, mux))),
+		Handler: instrumentMiddleware(inst, accessLog(logger, mux)),
 	}
 	return srv, hc.seed
 }
@@ -382,19 +399,4 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
-}
-
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Upgrade, Connection")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }

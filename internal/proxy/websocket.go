@@ -3,13 +3,31 @@ package proxy
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	// Same-origin policy for the browser-facing upgrade: accept
+	// requests with no Origin header (curl, agents, other non-browser
+	// clients) and requests whose Origin host matches the request
+	// Host. Anything else is a cross-site WebSocket attempt — the
+	// browser would send the manager's session cookie along, so a
+	// permissive check here would let any visited page drive the
+	// agent API through the manager.
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		return strings.EqualFold(u.Host, r.Host)
+	},
 }
 
 // handleWebSocket upgrades the client connection, dials the agent,

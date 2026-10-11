@@ -114,6 +114,42 @@ function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+// --- Manager authentication ---
+//
+// The manager itself can require an access token for all /api/* routes
+// (configured server-side via -auth-token-file / METROO_MANAGER_AUTH_TOKEN).
+// Browser clients authenticate once via POST /api/auth/login, which sets an
+// HttpOnly session cookie that same-origin fetch() and WebSocket upgrades
+// then carry automatically — the token is never readable from JS.
+//
+// The manager marks its own 401s with `WWW-Authenticate: Bearer
+// realm="muti-metroo-manager"` so they can be told apart from a 401 relayed
+// from the agent through /api/proxy (which concerns the agent token above).
+const MANAGER_AUTH_REALM = 'muti-metroo-manager';
+
+function isManagerAuthResponse(status: number, wwwAuthenticate: string | null): boolean {
+  return status === 401 && (wwwAuthenticate ?? '').includes(MANAGER_AUTH_REALM);
+}
+
+// Dispatched when the manager itself refuses a request with a manager-realm
+// 401. App.tsx listens and shows the manager login gate.
+function dispatchManagerAuthRequired(): void {
+  window.dispatchEvent(new CustomEvent('manager-auth-required'));
+}
+
+// Exchanges the manager token for the session cookie. Throws ApiError(401)
+// when the token is wrong.
+export async function managerLogin(token: string): Promise<void> {
+  const resp = await fetch(`${BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  if (!resp.ok) {
+    throw new ApiError('Invalid manager token', resp.status);
+  }
+}
+
 // Codes the agent returns when a privileged operation (shell, file transfer,
 // dynamic config mutation) lacks a valid management-key signature. A 401
 // carrying one of these in its body is NOT a bearer-token failure and must
@@ -128,6 +164,13 @@ async function fetchJSON<T>(url: string, method = 'GET', body?: unknown): Promis
   }
   const resp = await fetch(`${BASE}${url}`, opts);
   if (resp.status === 401) {
+    // The manager's own 401 (marked by its WWW-Authenticate realm) means the
+    // manager session is missing/expired — prompt for the manager token, and
+    // leave the agent token alone.
+    if (isManagerAuthResponse(resp.status, resp.headers?.get?.('WWW-Authenticate') ?? null)) {
+      dispatchManagerAuthRequired();
+      throw new Error('Manager authentication required');
+    }
     const text = await resp.text().catch(() => '');
     try {
       const obj = JSON.parse(text);
@@ -342,6 +385,10 @@ export async function downloadFile(agentId: string, path: string): Promise<Blob>
     body: JSON.stringify(body),
   });
   if (resp.status === 401) {
+    if (isManagerAuthResponse(resp.status, resp.headers?.get?.('WWW-Authenticate') ?? null)) {
+      dispatchManagerAuthRequired();
+      throw new Error('Manager authentication required');
+    }
     clearToken();
     window.dispatchEvent(new CustomEvent('auth-required'));
     throw new Error('Authentication required');
@@ -376,6 +423,11 @@ export async function uploadFile(
       };
       xhr.onload = () => {
         if (xhr.status === 401) {
+          if (isManagerAuthResponse(xhr.status, xhr.getResponseHeader('WWW-Authenticate'))) {
+            dispatchManagerAuthRequired();
+            reject(new Error('Manager authentication required'));
+            return;
+          }
           clearToken();
           window.dispatchEvent(new CustomEvent('auth-required'));
           reject(new Error('Authentication required'));
@@ -402,6 +454,10 @@ export async function uploadFile(
     body: form,
   });
   if (resp.status === 401) {
+    if (isManagerAuthResponse(resp.status, resp.headers?.get?.('WWW-Authenticate') ?? null)) {
+      dispatchManagerAuthRequired();
+      throw new Error('Manager authentication required');
+    }
     clearToken();
     window.dispatchEvent(new CustomEvent('auth-required'));
     throw new Error('Authentication required');

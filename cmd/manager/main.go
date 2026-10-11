@@ -65,6 +65,24 @@ func runServer(args []string) int {
 		logger.Warn(w)
 	}
 
+	if cfg.AuthToken == "" {
+		if !cfg.InsecureNoAuth && !server.BindsLoopbackOnly(cfg.Addr) {
+			fmt.Fprintf(os.Stderr,
+				"refusing to start: no manager auth token configured and %s is not a loopback address.\n"+
+					"Set -auth-token-file (or "+config.EnvAuthToken+") so the /api/* routes — including the\n"+
+					"agent proxy with remote shell and file transfer — require authentication, or pass\n"+
+					"-insecure-no-auth to run an unauthenticated listener on a non-loopback address.\n",
+				cfg.Addr)
+			return 2
+		}
+		logger.Warn("manager auth token is NOT set: all /api/* endpoints (including the agent proxy, "+
+			"remote shell, and file transfer) are UNAUTHENTICATED — set -auth-token-file or "+
+			config.EnvAuthToken+" before exposing this listener",
+			slog.String("addr", cfg.Addr),
+			slog.Bool("insecure_no_auth", cfg.InsecureNoAuth),
+		)
+	}
+
 	lock, err := store.AcquireInstanceLock(cfg.DataDir)
 	if err != nil {
 		logger.Error("acquire lock", slog.String("err", err.Error()))
@@ -99,6 +117,7 @@ func runServer(args []string) int {
 		Addr:         cfg.Addr,
 		AgentURL:     cfg.Agent,
 		AgentToken:   cfg.AgentToken,
+		AuthToken:    cfg.AuthToken,
 		Store:        st,
 		Bundle:       bundle,
 		Version:      Version,
@@ -171,6 +190,7 @@ func printStartupBanner(logger *slog.Logger, in bannerInputs) {
 		in.cfg.Addr, bindNote(in.cfg.Addr)))
 	logger.Info(fmt.Sprintf("  agent:     %s%s", in.cfg.Agent, agentNote(in.probe)))
 	logger.Info(fmt.Sprintf("  token:     %s", tokenSourceNote(in.cfg)))
+	logger.Info(fmt.Sprintf("  auth:      %s", authNote(in.cfg)))
 	logger.Info(fmt.Sprintf("  data-dir:  %s (db: %s, lock: %s)", in.cfg.DataDir, displayPath(in.store.Path()), displayPath(in.lock.Path())))
 	logger.Info(fmt.Sprintf("  downloads: %s", bundleNote(in.bundle, in.bundlePath, in.bundleDisabled)))
 	if in.store.FirstRun() {
@@ -216,6 +236,20 @@ func tokenSourceNote(cfg config.Config) string {
 		return "from " + cfg.AgentTokenFile
 	}
 	return "set"
+}
+
+// authNote summarises the manager-auth posture for the banner.
+func authNote(cfg config.Config) string {
+	if cfg.AuthToken != "" {
+		if cfg.AuthTokenFile != "" {
+			return "required, token from " + cfg.AuthTokenFile
+		}
+		return "required"
+	}
+	if cfg.InsecureNoAuth {
+		return "DISABLED via -insecure-no-auth"
+	}
+	return "DISABLED (loopback bind only)"
 }
 
 func bundleNote(b *downloads.Bundle, src string, disabled bool) string {

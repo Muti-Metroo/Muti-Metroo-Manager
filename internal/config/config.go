@@ -31,6 +31,23 @@ type Config struct {
 	// via /proc/<pid>/cmdline on multi-tenant hosts.
 	AgentTokenFile string `toml:"agent_token_file"`
 
+	// AuthToken guards the manager's own /api/* routes (including the
+	// agent proxy). Resolved like AgentToken: -auth-token flag,
+	// METROO_MANAGER_AUTH_TOKEN env var, then AuthTokenFile. Empty means
+	// "no manager auth" — only permitted on loopback binds unless
+	// InsecureNoAuth is set.
+	AuthToken string `toml:"-"`
+
+	// AuthTokenFile is the path to a file containing the manager auth
+	// token. Preferred over -auth-token for the same /proc reason as
+	// AgentTokenFile.
+	AuthTokenFile string `toml:"auth_token_file"`
+
+	// InsecureNoAuth explicitly allows binding a non-loopback address
+	// with no manager auth token. Without it (or a token) the server
+	// refuses to start on a wildcard bind.
+	InsecureNoAuth bool `toml:"insecure_no_auth"`
+
 	// DataDir is where muti-metroo-manager.db and the instance lock live.
 	DataDir string `toml:"data_dir"`
 
@@ -75,6 +92,9 @@ func Defaults() Config {
 		Agent:           "http://127.0.0.1:8080",
 		AgentToken:      "",
 		AgentTokenFile:  "",
+		AuthToken:       "",
+		AuthTokenFile:   "",
+		InsecureNoAuth:  false,
 		DataDir:         DefaultDataDir(),
 		DownloadsBundle: "",
 		NoDownloads:     false,
@@ -106,6 +126,9 @@ var allFields = []string{
 	"agent",
 	"agent_token",
 	"agent_token_file",
+	"auth_token",
+	"auth_token_file",
+	"insecure_no_auth",
 	"data_dir",
 	"downloads_bundle",
 	"no_downloads",

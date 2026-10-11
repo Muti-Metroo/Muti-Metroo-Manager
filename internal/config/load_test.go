@@ -309,3 +309,118 @@ no_downloads = false
 		t.Errorf("round-trip parse missing fields: %+v", got)
 	}
 }
+
+func TestAuthTokenEnv(t *testing.T) {
+	t.Setenv(EnvAgentToken, "")
+	t.Setenv(EnvAgentTokenLegacy, "")
+	t.Setenv(EnvAuthToken, "manager-env-token")
+	lf := NewLoadFlags("test", &bytes.Buffer{})
+	if err := lf.Parse(nil); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	res, err := lf.Resolve()
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if res.Config.AuthToken != "manager-env-token" {
+		t.Errorf("AuthToken = %q, want manager-env-token", res.Config.AuthToken)
+	}
+	if res.Source["auth_token"] != SourceEnv {
+		t.Errorf("source[auth_token] = %q, want env", res.Source["auth_token"])
+	}
+	if len(res.Warnings) != 0 {
+		t.Errorf("expected no warnings, got %v", res.Warnings)
+	}
+}
+
+func TestAuthTokenFlagWarnsAboutProc(t *testing.T) {
+	t.Setenv(EnvAgentToken, "")
+	t.Setenv(EnvAgentTokenLegacy, "")
+	t.Setenv(EnvAuthToken, "")
+	lf := NewLoadFlags("test", &bytes.Buffer{})
+	if err := lf.Parse([]string{"-auth-token", "inline-token"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	res, err := lf.Resolve()
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if res.Config.AuthToken != "inline-token" {
+		t.Errorf("AuthToken = %q, want inline-token", res.Config.AuthToken)
+	}
+	if res.Source["auth_token"] != SourceFlag {
+		t.Errorf("source[auth_token] = %q, want flag", res.Source["auth_token"])
+	}
+	found := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "/proc") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a /proc exposure warning, got %v", res.Warnings)
+	}
+}
+
+func TestAuthTokenFile(t *testing.T) {
+	t.Setenv(EnvAgentToken, "")
+	t.Setenv(EnvAgentTokenLegacy, "")
+	t.Setenv(EnvAuthToken, "")
+	dir := t.TempDir()
+	tokPath := filepath.Join(dir, "auth-token")
+	if err := os.WriteFile(tokPath, []byte("file-auth-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lf := NewLoadFlags("test", &bytes.Buffer{})
+	if err := lf.Parse([]string{"-auth-token-file", tokPath}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	res, err := lf.Resolve()
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if res.Config.AuthToken != "file-auth-token" {
+		t.Errorf("AuthToken = %q, want file-auth-token", res.Config.AuthToken)
+	}
+	if res.Source["auth_token"] != SourceTokenFile {
+		t.Errorf("source[auth_token] = %q, want token-file", res.Source["auth_token"])
+	}
+}
+
+func TestFileLayerAuthKeys(t *testing.T) {
+	t.Setenv(EnvAgentToken, "")
+	t.Setenv(EnvAgentTokenLegacy, "")
+	t.Setenv(EnvAuthToken, "")
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.toml")
+	body := "auth_token_file = \"/etc/mmm/auth-token\"\ninsecure_no_auth = true\n"
+	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lf := NewLoadFlags("test", &bytes.Buffer{})
+	if err := lf.Parse([]string{"-config", cfgPath}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	// The referenced token file doesn't exist, so resolution fails at
+	// the token-file step — proving the file-layer keys were applied.
+	if _, err := lf.Resolve(); err == nil ||
+		!strings.Contains(err.Error(), "auth_token_file") {
+		t.Fatalf("expected auth_token_file read error, got %v", err)
+	}
+}
+
+func TestFileRejectsAuthTokenInline(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(cfgPath, []byte("auth_token = \"abc\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lf := NewLoadFlags("test", &bytes.Buffer{})
+	if err := lf.Parse([]string{"-config", cfgPath}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if _, err := lf.Resolve(); err == nil ||
+		!strings.Contains(err.Error(), "auth_token") {
+		t.Fatalf("expected auth_token-in-file rejection, got %v", err)
+	}
+}

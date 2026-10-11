@@ -27,6 +27,7 @@ type LoadResult struct {
 const (
 	EnvAgentToken       = "METROO_MANAGER_AGENT_TOKEN"
 	EnvAgentTokenLegacy = "MUTI_METROO_TOKEN"
+	EnvAuthToken        = "METROO_MANAGER_AUTH_TOKEN"
 )
 
 // LoadFlags is the set of command-line flags that produce the
@@ -41,6 +42,9 @@ type LoadFlags struct {
 	agent          string
 	agentToken     string
 	agentTokenFile string
+	authToken      string
+	authTokenFile  string
+	insecureNoAuth bool
 	dataDir        string
 	downloadsBnd   string
 	noDownloads    bool
@@ -68,6 +72,12 @@ func NewLoadFlags(name string, errOut io.Writer) *LoadFlags {
 		"bearer token for the agent (prefer -agent-token-file or "+EnvAgentToken+" env)")
 	fs.StringVar(&lf.agentTokenFile, "agent-token-file", "",
 		"path to a file containing the bearer token (single line, trimmed)")
+	fs.StringVar(&lf.authToken, "auth-token", "",
+		"bearer token guarding the manager's own /api/* routes (prefer -auth-token-file or "+EnvAuthToken+" env)")
+	fs.StringVar(&lf.authTokenFile, "auth-token-file", "",
+		"path to a file containing the manager auth token (single line, trimmed)")
+	fs.BoolVar(&lf.insecureNoAuth, "insecure-no-auth", false,
+		"allow binding a non-loopback address with no manager auth token (dangerous)")
 	fs.StringVar(&lf.dataDir, "data-dir", d.DataDir,
 		"directory for persistent state (muti-metroo-manager.db)")
 	fs.StringVar(&lf.downloadsBnd, "downloads-bundle", "",
@@ -140,6 +150,10 @@ func (lf *LoadFlags) Resolve() (LoadResult, error) {
 			"environment variable "+EnvAgentTokenLegacy+
 				" is deprecated; use "+EnvAgentToken+" instead")
 	}
+	if v := os.Getenv(EnvAuthToken); v != "" {
+		cfg.AuthToken = v
+		src["auth_token"] = SourceEnv
+	}
 
 	// Flag layer — only fields actually set on the command line win.
 	setFlags := map[string]bool{}
@@ -163,6 +177,21 @@ func (lf *LoadFlags) Resolve() (LoadResult, error) {
 	if setFlags["agent-token-file"] {
 		cfg.AgentTokenFile = lf.agentTokenFile
 		src["agent_token_file"] = SourceFlag
+	}
+	if setFlags["auth-token"] {
+		cfg.AuthToken = lf.authToken
+		src["auth_token"] = SourceFlag
+		warnings = append(warnings,
+			"-auth-token reads the token from argv (visible to other users via /proc); "+
+				"prefer -auth-token-file or "+EnvAuthToken+" env")
+	}
+	if setFlags["auth-token-file"] {
+		cfg.AuthTokenFile = lf.authTokenFile
+		src["auth_token_file"] = SourceFlag
+	}
+	if setFlags["insecure-no-auth"] {
+		cfg.InsecureNoAuth = lf.insecureNoAuth
+		src["insecure_no_auth"] = SourceFlag
 	}
 	if setFlags["data-dir"] {
 		cfg.DataDir = lf.dataDir
@@ -207,6 +236,14 @@ func (lf *LoadFlags) Resolve() (LoadResult, error) {
 		cfg.AgentToken = tok
 		src["agent_token"] = SourceTokenFile
 	}
+	if cfg.AuthTokenFile != "" && cfg.AuthToken == "" {
+		tok, err := readTokenFile(cfg.AuthTokenFile)
+		if err != nil {
+			return LoadResult{}, fmt.Errorf("read auth_token_file: %w", err)
+		}
+		cfg.AuthToken = tok
+		src["auth_token"] = SourceTokenFile
+	}
 
 	return LoadResult{
 		Config:     cfg,
@@ -248,6 +285,10 @@ func applyFileLayer(cfg *Config, src Source, m map[string]any) error {
 			err = strField(k, &cfg.Agent, v)
 		case "agent_token_file":
 			err = strField(k, &cfg.AgentTokenFile, v)
+		case "auth_token_file":
+			err = strField(k, &cfg.AuthTokenFile, v)
+		case "insecure_no_auth":
+			err = boolField(k, &cfg.InsecureNoAuth, v)
 		case "data_dir":
 			err = strField(k, &cfg.DataDir, v)
 		case "downloads_bundle":
@@ -264,6 +305,8 @@ func applyFileLayer(cfg *Config, src Source, m map[string]any) error {
 			err = boolField(k, &cfg.NoSounds, v)
 		case "agent_token":
 			return fmt.Errorf("agent_token in config files is not supported; use agent_token_file or " + EnvAgentToken)
+		case "auth_token":
+			return fmt.Errorf("auth_token in config files is not supported; use auth_token_file or " + EnvAuthToken)
 		default:
 			return fmt.Errorf("unknown key %q (run `muti-metroo-manager config init` for the full list)", k)
 		}

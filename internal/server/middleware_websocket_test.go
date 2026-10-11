@@ -40,7 +40,7 @@ func TestMiddleware_AllowsWebSocketUpgrade(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	inst := newInstrumentation(nil)
-	handler := corsMiddleware(instrumentMiddleware(inst, accessLog(logger, mux)))
+	handler := instrumentMiddleware(inst, accessLog(logger, mux))
 
 	srv := httptest.NewServer(handler)
 	defer srv.Close()

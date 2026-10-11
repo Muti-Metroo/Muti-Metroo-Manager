@@ -90,6 +90,19 @@ agent = %q
 # environment (which is visible to anything that can read /proc/environ).
 agent_token_file = %q
 
+# Path to a file containing the manager's own auth token. When set,
+# every /api/* route (including the agent proxy, remote shell, and
+# file transfer) requires an Authorization: Bearer header or the
+# session cookie set by the UI's login gate. When empty the manager
+# refuses to bind a non-loopback address unless insecure_no_auth is
+# set. Preferred over -auth-token for the same /proc reason as above.
+auth_token_file = %q
+
+# Explicitly allow binding a non-loopback address with no manager auth
+# token. Dangerous: anyone who can reach the port gets full control of
+# the agent API.
+insecure_no_auth = %t
+
 # Persistent state directory. Holds muti-metroo-manager.db and the instance lock.
 data_dir = %q
 
@@ -119,6 +132,8 @@ metrics_addr = %q
 		d.Addr,
 		d.Agent,
 		d.AgentTokenFile,
+		d.AuthTokenFile,
+		d.InsecureNoAuth,
 		d.DataDir,
 		d.DownloadsBundle,
 		d.NoDownloads,
