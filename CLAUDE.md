@@ -259,7 +259,17 @@ Error codes: `ERR_SHELL_DISABLED = 20`, `ERR_SHELL_AUTH_REQUIRED = 21`, `ERR_SHE
 
 ## Releasing
 
-Releases are managed manually via `release.sh`. The script bumps the version, cross-compiles binaries, and creates a GitHub release with assets.
+Day-to-day releases are automated via GitHub Actions using
+[release-please](https://github.com/googleapis/release-please)
+(`.github/workflows/release-please.yml`): land Conventional Commits on
+master, release-please opens a release PR that bumps `VERSION` and
+`CHANGELOG.md`, and merging it tags the release.
+
+`release.sh` exists for a full binary release with cross-compiled
+assets: the script bumps the version, cross-compiles binaries, and
+creates a GitHub release with assets. Do not run it for routine work —
+let release-please cut the tag first, otherwise the two version bumpers
+race.
 
 ### Prerequisites
 
@@ -267,7 +277,7 @@ Releases are managed manually via `release.sh`. The script bumps the version, cr
 - `upx` (optional — compresses Linux (amd64+arm64) and Windows amd64 binaries)
 - `GITHUB_TOKEN` environment variable (GitHub API token with repo write access)
 
-### How to Release
+### How to Release (manual, binary assets)
 
 ```bash
 # Patch release (default): 0.1.4 → 0.1.5
@@ -307,7 +317,7 @@ Linux (amd64+arm64) and Windows amd64 binaries are compressed with UPX. Darwin b
 ### Version Management
 
 - Version is stored in `VERSION` file at the project root
-- The release script is the only thing that modifies `VERSION` — do not edit it manually
+- `VERSION` is bumped by release-please's release PR (or by `release.sh` for a manual binary release) — do not edit it manually
 - Git tags follow the format `v{VERSION}` (e.g., `v0.2.0`)
 
 **Binaries location**: https://github.com/postalsys/Muti-Metroo-Manager/releases
