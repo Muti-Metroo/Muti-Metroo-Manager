@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { TopologyAgentInfo, PeerEntry, PeerTransport } from '../../api/types';
 import { PEER_TRANSPORTS } from '../../api/types';
-import { manageAgentPeers, probeAgentPeer, ApiError } from '../../api/client';
+import { manageAgentPeers, probeAgentPeer } from '../../api/client';
 import { formatPeerAddress, normalizePath } from '../../util/peerAddress';
+import { useAgentResource } from '../../hooks/useAgentResource';
 import Alert from '../Alert';
 import ConfirmDialog from '../ConfirmDialog';
 
@@ -57,10 +58,18 @@ export default function PeersTab({
   onPeersChanged,
 }: PeersTabProps) {
   const canMutate = canSignManagement !== false;
-  const [peers, setPeers] = useState<PeerEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unreachable, setUnreachable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: peers,
+    loading,
+    error,
+    setError,
+    unavailable: unreachable,
+    reload: fetchPeers,
+  } = useAgentResource(
+    () => manageAgentPeers(agent.id, agent.is_local, { action: 'list' }).then(r => r.peers || []),
+    { initial: [] as PeerEntry[], fallbackError: 'Failed to fetch peers' },
+    [agent.id, agent.is_local],
+  );
   const [success, setSuccess] = useState<string | null>(null);
   const [newAddress, setNewAddress] = useState('');
   const [newTransport, setNewTransport] = useState<PeerTransport>('quic');
@@ -73,29 +82,6 @@ export default function PeersTab({
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const hasHttpPath = newTransport === 'ws' || newTransport === 'h2';
-
-  const fetchPeers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setUnreachable(false);
-    try {
-      const resp = await manageAgentPeers(agent.id, agent.is_local, { action: 'list' });
-      setPeers(resp.peers || []);
-    } catch (err: any) {
-      const msg = err?.message || '';
-      if ((err instanceof ApiError && err.status === 502) || msg.includes('no route to agent')) {
-        setUnreachable(true);
-      } else {
-        setError(msg || 'Failed to fetch peers');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [agent.id, agent.is_local]);
-
-  useEffect(() => {
-    fetchPeers();
-  }, [fetchPeers]);
 
   const performAdd = useCallback(
     async (

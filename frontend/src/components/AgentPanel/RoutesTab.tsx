@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { TopologyAgentInfo, RouteManageRequest, InterfaceAddr } from '../../api/types';
-import { manageAgentRoutes, getAgentInterfaces, ApiError } from '../../api/client';
+import { manageAgentRoutes, getAgentInterfaces } from '../../api/client';
 import { deriveSourceIpHints } from '../../api/agentSourceHints';
+import { useAgentResource } from '../../hooks/useAgentResource';
+import { validateCIDR } from '../../util/validate';
 import Alert from '../Alert';
 import ConfirmDialog from '../ConfirmDialog';
 import RouteEditDialog from '../RouteEditDialog';
@@ -54,10 +56,21 @@ interface RouteEntry {
 
 export default function RoutesTab({ agent, canSignManagement, onRoutesChanged }: RoutesTabProps) {
   const canMutate = canSignManagement !== false;
-  const [routes, setRoutes] = useState<RouteEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unreachable, setUnreachable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: routes,
+    loading,
+    error,
+    setError,
+    unavailable: unreachable,
+    reload: fetchRoutes,
+  } = useAgentResource(
+    () =>
+      manageAgentRoutes(agent.id, agent.is_local, { action: 'list', scope: 'all' }).then(
+        resp => resp.routes || [],
+      ),
+    { initial: [] as RouteEntry[], fallbackError: 'Failed to fetch routes' },
+    [agent.id, agent.is_local],
+  );
   const [success, setSuccess] = useState<string | null>(null);
   const [newCidr, setNewCidr] = useState('');
   const [newMetric, setNewMetric] = useState('100');
@@ -111,47 +124,32 @@ export default function RoutesTab({ agent, canSignManagement, onRoutesChanged }:
     };
   }, [editRoute, interfaceAddrs, agent.id, agent.is_local]);
 
-  const fetchRoutes = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setUnreachable(false);
-    try {
-      const resp = await manageAgentRoutes(agent.id, agent.is_local, {
-        action: 'list',
-        scope: 'all',
-      });
-      setRoutes(resp.routes || []);
-    } catch (err: any) {
-      const msg = err?.message || '';
-      if ((err instanceof ApiError && err.status === 502) || msg.includes('no route to agent')) {
-        setUnreachable(true);
-      } else {
-        setError(msg || 'Failed to fetch routes');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [agent.id, agent.is_local]);
-
-  useEffect(() => {
-    fetchRoutes();
-  }, [fetchRoutes]);
-
   const handleAdd = useCallback(async () => {
-    if (!newCidr.trim()) return;
+    const cidr = newCidr.trim();
+    if (!cidr) return;
+    const cidrError = validateCIDR(cidr);
+    if (cidrError) {
+      setError(cidrError);
+      return;
+    }
+    const metricText = newMetric.trim();
+    if (!/^\d+$/.test(metricText)) {
+      setError('Metric must be a non-negative integer');
+      return;
+    }
     setActionLoading(true);
     setError(null);
     setSuccess(null);
     try {
       const req: RouteManageRequest = {
         action: 'add',
-        network: newCidr.trim(),
-        metric: parseInt(newMetric) || 100,
+        network: cidr,
+        metric: parseInt(metricText, 10),
       };
       const c = newComment.trim();
       if (c) req.comment = c;
       await manageAgentRoutes(agent.id, agent.is_local, req);
-      setSuccess(`Added route ${newCidr.trim()}`);
+      setSuccess(`Added route ${cidr}`);
       setNewCidr('');
       setNewComment('');
       await fetchRoutes();

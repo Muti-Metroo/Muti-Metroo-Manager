@@ -47,6 +47,15 @@ export class ApiError extends Error {
   }
 }
 
+// True when a proxied agent call failed because the manager couldn't
+// reach the target agent at all (502 from the proxy, or the agent's
+// "no route to agent" relay error) — the tabs render a dedicated
+// unreachable banner for this instead of a generic error.
+export function isUnreachableError(err: unknown): boolean {
+  const msg = (err as { message?: string })?.message || '';
+  return (err instanceof ApiError && err.status === 502) || msg.includes('no route to agent');
+}
+
 // --- Token management ---
 //
 // Two persistence levels are supported. The default ('session') keeps

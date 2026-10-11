@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import type { MeshTestResult } from '../../api/types';
 import type { PositionedAgent } from './layout';
 import { AgentIconNode, ICON_BY_KEY } from './agentIcons';
@@ -27,7 +27,7 @@ interface StationProps {
   onActivate: (agentId: string) => void;
 }
 
-export default function Station({
+function Station({
   agent,
   meshResult,
   highlightState,
@@ -128,3 +128,7 @@ export default function Station({
     </g>
   );
 }
+
+// Memoized like Connection: MetroMap hands stations stable callbacks, so
+// a poll that doesn't change this agent's row skips the re-render.
+export default memo(Station);

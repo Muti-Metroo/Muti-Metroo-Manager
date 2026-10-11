@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { manageMeshHostSuffixes, ApiError } from '../api/client';
 import { normalizeSuffix } from '../util/meshSuffix';
+import { useAgentResource } from '../hooks/useAgentResource';
 import Alert from './Alert';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -11,37 +12,29 @@ interface DnsTldsTabProps {
 export default function DnsTldsTab({ canSignManagement }: DnsTldsTabProps) {
   const canMutate = canSignManagement !== false;
 
-  const [suffixes, setSuffixes] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unavailable, setUnavailable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: suffixes,
+    loading,
+    error,
+    setError,
+    setData: setSuffixes,
+    unavailable,
+  } = useAgentResource(
+    () => manageMeshHostSuffixes({ action: 'list' }).then(resp => resp.suffixes || []),
+    {
+      initial: [] as string[],
+      fallbackError: 'Failed to fetch TLD suffixes',
+      // 503 → mesh hosts not configured on this agent (older build or
+      // disabled). Render an explanatory empty state instead of an error.
+      isUnavailable: err => err instanceof ApiError && err.status === 503,
+    },
+    [],
+  );
   const [success, setSuccess] = useState<string | null>(null);
 
   const [newSuffix, setNewSuffix] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-
-  const fetchSuffixes = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setUnavailable(false);
-    try {
-      const resp = await manageMeshHostSuffixes({ action: 'list' });
-      setSuffixes(resp.suffixes || []);
-    } catch (err: any) {
-      if (err instanceof ApiError && err.status === 503) {
-        setUnavailable(true);
-      } else {
-        setError(err?.message || 'Failed to fetch TLD suffixes');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSuffixes();
-  }, [fetchSuffixes]);
 
   const validation = newSuffix.trim() ? normalizeSuffix(newSuffix) : null;
   const validationError = validation && !validation.ok ? validation.error : null;
@@ -62,27 +55,30 @@ export default function DnsTldsTab({ canSignManagement }: DnsTldsTabProps) {
     } finally {
       setActionLoading(false);
     }
-  }, [validation]);
+  }, [validation, setSuffixes, setError]);
 
-  const handleRemove = useCallback(async (suffix: string) => {
-    setActionLoading(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const resp = await manageMeshHostSuffixes({ action: 'remove', suffix });
-      setSuffixes(resp.suffixes || []);
-      setSuccess(`Removed .${suffix}`);
-      setConfirmRemove(null);
-    } catch (err: any) {
-      // 409 → suffix has registered hosts; the server lists them in the
-      // error body. Show verbatim so the operator can see which hosts to
-      // remove first.
-      setError(err?.message || 'Failed to remove TLD suffix');
-      setConfirmRemove(null);
-    } finally {
-      setActionLoading(false);
-    }
-  }, []);
+  const handleRemove = useCallback(
+    async (suffix: string) => {
+      setActionLoading(true);
+      setError(null);
+      setSuccess(null);
+      try {
+        const resp = await manageMeshHostSuffixes({ action: 'remove', suffix });
+        setSuffixes(resp.suffixes || []);
+        setSuccess(`Removed .${suffix}`);
+        setConfirmRemove(null);
+      } catch (err: any) {
+        // 409 → suffix has registered hosts; the server lists them in the
+        // error body. Show verbatim so the operator can see which hosts to
+        // remove first.
+        setError(err?.message || 'Failed to remove TLD suffix');
+        setConfirmRemove(null);
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [setSuffixes, setError],
+  );
 
   if (unavailable) {
     return (

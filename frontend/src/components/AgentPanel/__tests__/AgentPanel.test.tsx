@@ -7,7 +7,9 @@ import type { TopologyAgentInfo } from '../../../api/types';
 
 // ShellTab is stubbed with a mount-tracking component: the assertion that
 // matters is whether React unmounts it on a panel-tab switch (which would
-// tear down the real terminal + WebSocket in its cleanup effect).
+// tear down the real terminal + WebSocket in its cleanup effect). ShellTab
+// is lazy-loaded in AgentPanel, so the first appearance is awaited with
+// findByTestId rather than asserted synchronously.
 const shellLifecycle = vi.hoisted(() => ({ mounts: 0, unmounts: 0 }));
 
 vi.mock('../ShellTab', () => ({
@@ -66,9 +68,9 @@ describe('AgentPanel shell session persistence', () => {
     shellLifecycle.unmounts = 0;
   });
 
-  it('keeps the shell tab mounted (display:none) across panel-tab switches', () => {
+  it('keeps the shell tab mounted (display:none) across panel-tab switches', async () => {
     const { rerender } = render(renderPanel('shell'));
-    expect(screen.getByTestId('shell-tab')).toBeInTheDocument();
+    await screen.findByTestId('shell-tab');
     expect(shellLifecycle.mounts).toBe(1);
 
     // Switch to Files: the shell subtree stays mounted but hidden.
@@ -80,6 +82,7 @@ describe('AgentPanel shell session persistence', () => {
 
     // Switch back: same instance becomes visible again, no remount.
     rerender(renderPanel('shell'));
+    await screen.findByTestId('shell-tab');
     expect(shellTab.parentElement).not.toHaveStyle({ display: 'none' });
     expect(shellLifecycle.mounts).toBe(1);
     expect(shellLifecycle.unmounts).toBe(0);

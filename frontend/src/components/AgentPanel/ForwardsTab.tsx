@@ -14,7 +14,8 @@ import type {
   ForwardEndpointEntry,
 } from '../../api/types';
 import { isAttachedTarget } from '../../api/types';
-import { manageAgentForwards, manageAgentForwardEndpoints, ApiError } from '../../api/client';
+import { manageAgentForwards, manageAgentForwardEndpoints } from '../../api/client';
+import { useAgentResource } from '../../hooks/useAgentResource';
 import Alert from '../Alert';
 import Tabs from '../Tabs';
 import ConfirmDialog from '../ConfirmDialog';
@@ -278,10 +279,18 @@ function ForwardSection<T extends ForwardEntryBase, V>({
   canSubmit,
   onChanged,
 }: ForwardSectionProps<T, V>) {
-  const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unreachable, setUnreachable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: items,
+    loading,
+    error,
+    setError,
+    unavailable: unreachable,
+    reload: load,
+  } = useAgentResource(
+    fetchItems,
+    { initial: [] as T[], fallbackError: `Failed to fetch ${itemLabel}s` },
+    [fetchItems, itemLabel],
+  );
   const [success, setSuccess] = useState<string | null>(null);
   const [newKey, setNewKey] = useState('');
   const [extra, setExtra] = useState<V>(extraInitial);
@@ -289,28 +298,6 @@ function ForwardSection<T extends ForwardEntryBase, V>({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const comboboxRef = useRef<HTMLDivElement>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setUnreachable(false);
-    try {
-      setItems(await fetchItems());
-    } catch (err: any) {
-      const msg = err?.message || '';
-      if ((err instanceof ApiError && err.status === 502) || msg.includes('no route to agent')) {
-        setUnreachable(true);
-      } else {
-        setError(msg || `Failed to fetch ${itemLabel}s`);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchItems, itemLabel]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const handleAdd = useCallback(async () => {
     const key = newKey.trim();

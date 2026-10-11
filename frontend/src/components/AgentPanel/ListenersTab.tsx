@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { TopologyAgentInfo, ListenerEntry, PeerTransport } from '../../api/types';
 import { PEER_TRANSPORTS, transportHasHttpPath } from '../../api/types';
-import { manageAgentListeners, ApiError } from '../../api/client';
+import { manageAgentListeners } from '../../api/client';
 import { normalizePath } from '../../util/peerAddress';
+import { useAgentResource } from '../../hooks/useAgentResource';
 import Alert from '../Alert';
 import ConfirmDialog from '../ConfirmDialog';
 
@@ -20,10 +21,21 @@ export default function ListenersTab({
   onListenersChanged,
 }: ListenersTabProps) {
   const canMutate = canSignManagement !== false;
-  const [listeners, setListeners] = useState<ListenerEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unreachable, setUnreachable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: listeners,
+    loading,
+    error,
+    setError,
+    unavailable: unreachable,
+    reload: fetchListeners,
+  } = useAgentResource(
+    () =>
+      manageAgentListeners(agent.id, agent.is_local, { action: 'list' }).then(
+        r => r.listeners || [],
+      ),
+    { initial: [] as ListenerEntry[], fallbackError: 'Failed to fetch listeners' },
+    [agent.id, agent.is_local],
+  );
   const [success, setSuccess] = useState<string | null>(null);
   const [newTransport, setNewTransport] = useState<PeerTransport>('quic');
   const [newAddress, setNewAddress] = useState('');
@@ -35,29 +47,6 @@ export default function ListenersTab({
 
   const hasHttpPath = transportHasHttpPath(newTransport);
   const isWs = newTransport === 'ws';
-
-  const fetchListeners = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setUnreachable(false);
-    try {
-      const resp = await manageAgentListeners(agent.id, agent.is_local, { action: 'list' });
-      setListeners(resp.listeners || []);
-    } catch (err: any) {
-      const msg = err?.message || '';
-      if ((err instanceof ApiError && err.status === 502) || msg.includes('no route to agent')) {
-        setUnreachable(true);
-      } else {
-        setError(msg || 'Failed to fetch listeners');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [agent.id, agent.is_local]);
-
-  useEffect(() => {
-    fetchListeners();
-  }, [fetchListeners]);
 
   const handleAdd = useCallback(async () => {
     const address = newAddress.trim();

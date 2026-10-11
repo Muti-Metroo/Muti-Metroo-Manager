@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { MeshHost } from '../api/types';
 import { manageMeshHosts, ApiError } from '../api/client';
 import { matchSuffix } from '../util/meshSuffix';
+import { useAgentResource } from '../hooks/useAgentResource';
 import Alert from './Alert';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -18,11 +19,23 @@ interface DnsHostsTabProps {
 export default function DnsHostsTab({ canSignManagement, onGoToTlds }: DnsHostsTabProps) {
   const canMutate = canSignManagement !== false;
 
-  const [hosts, setHosts] = useState<MeshHost[]>([]);
-  const [suffixes, setSuffixes] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unavailable, setUnavailable] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, setError, setData, unavailable } = useAgentResource(
+    () =>
+      manageMeshHosts({ action: 'list' }).then(resp => ({
+        hosts: resp.hosts || [],
+        suffixes: resp.suffixes || [],
+      })),
+    {
+      initial: { hosts: [] as MeshHost[], suffixes: [] as string[] },
+      fallbackError: 'Failed to fetch DNS entries',
+      // 503 → mesh hosts not configured on this agent (older build or
+      // disabled). Render an explanatory empty state instead of an error.
+      isUnavailable: err => err instanceof ApiError && err.status === 503,
+    },
+    [],
+  );
+  const hosts = data.hosts;
+  const suffixes = data.suffixes;
   const [success, setSuccess] = useState<string | null>(null);
 
   const [newName, setNewName] = useState('');
@@ -32,31 +45,6 @@ export default function DnsHostsTab({ canSignManagement, onGoToTlds }: DnsHostsT
 
   const [actionLoading, setActionLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-
-  const fetchHosts = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setUnavailable(false);
-    try {
-      const resp = await manageMeshHosts({ action: 'list' });
-      setHosts(resp.hosts || []);
-      setSuffixes(resp.suffixes || []);
-    } catch (err: any) {
-      // 503 → mesh hosts not configured on this agent (older build or
-      // disabled). Render an explanatory empty state instead of an error.
-      if (err instanceof ApiError && err.status === 503) {
-        setUnavailable(true);
-      } else {
-        setError(err?.message || 'Failed to fetch DNS entries');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchHosts();
-  }, [fetchHosts]);
 
   const trimmedName = newName.trim().toLowerCase();
   const trimmedIPv4 = newIPv4.trim();
@@ -84,8 +72,7 @@ export default function DnsHostsTab({ canSignManagement, onGoToTlds }: DnsHostsT
       const c = newComment.trim();
       if (c) req.comment = c;
       const resp = await manageMeshHosts(req);
-      setHosts(resp.hosts || []);
-      setSuffixes(resp.suffixes || []);
+      setData({ hosts: resp.hosts || [], suffixes: resp.suffixes || [] });
       setSuccess(`Added ${trimmedName}`);
       setNewName('');
       setNewIPv4('');
@@ -96,32 +83,34 @@ export default function DnsHostsTab({ canSignManagement, onGoToTlds }: DnsHostsT
     } finally {
       setActionLoading(false);
     }
-  }, [canSubmit, trimmedName, trimmedIPv4, trimmedIPv6, newComment]);
+  }, [canSubmit, trimmedName, trimmedIPv4, trimmedIPv6, newComment, setData, setError]);
 
-  const handleRemove = useCallback(async (name: string) => {
-    setActionLoading(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const resp = await manageMeshHosts({ action: 'remove', name });
-      setHosts(resp.hosts || []);
-      setSuffixes(resp.suffixes || []);
-      setSuccess(`Removed ${name}`);
-      setConfirmRemove(null);
-    } catch (err: any) {
-      // 403 → ErrProtected: config-seeded host. Surface a clearer message.
-      if (err instanceof ApiError && err.status === 403) {
-        setError(
-          `${name} is config-seeded and cannot be removed via the UI. Edit the agent's YAML and restart.`,
-        );
-      } else {
-        setError(err?.message || 'Failed to remove DNS entry');
+  const handleRemove = useCallback(
+    async (name: string) => {
+      setActionLoading(true);
+      setError(null);
+      setSuccess(null);
+      try {
+        const resp = await manageMeshHosts({ action: 'remove', name });
+        setData({ hosts: resp.hosts || [], suffixes: resp.suffixes || [] });
+        setSuccess(`Removed ${name}`);
+        setConfirmRemove(null);
+      } catch (err: any) {
+        // 403 → ErrProtected: config-seeded host. Surface a clearer message.
+        if (err instanceof ApiError && err.status === 403) {
+          setError(
+            `${name} is config-seeded and cannot be removed via the UI. Edit the agent's YAML and restart.`,
+          );
+        } else {
+          setError(err?.message || 'Failed to remove DNS entry');
+        }
+        setConfirmRemove(null);
+      } finally {
+        setActionLoading(false);
       }
-      setConfirmRemove(null);
-    } finally {
-      setActionLoading(false);
-    }
-  }, []);
+    },
+    [setData, setError],
+  );
 
   if (unavailable) {
     return (

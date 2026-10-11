@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import type {
   TopologyAgentInfo,
   MeshTestResult,
@@ -13,12 +13,15 @@ import InfoTab from './InfoTab';
 import RoutesTab from './RoutesTab';
 import ForwardsTab from './ForwardsTab';
 import ConnectivityTab from './ConnectivityTab';
-import ShellTab from './ShellTab';
 import FilesTab from './FilesTab';
 import PingTab from './PingTab';
 import { isModalOpen } from '../../hooks/useModalDismiss';
 import type { KnownNetwork } from '../../util/networks';
 import Alert from '../Alert';
+
+// Lazy so @xterm (the heaviest dependency) ships in its own chunk and is
+// only fetched when an operator actually opens the shell tab.
+const ShellTab = lazy(() => import('./ShellTab'));
 
 interface AgentPanelProps {
   agent: TopologyAgentInfo;
@@ -327,13 +330,15 @@ export default function AgentPanel({
             className="flex min-h-0 flex-1 flex-col"
             style={activeTab === 'shell' ? undefined : { display: 'none' }}
           >
-            <ShellTab
-              agent={agent}
-              isActive={isActive && activeTab === 'shell'}
-              disabled={shellDisabled}
-              apiAddress={apiAddress}
-              onDisabled={() => handleCapUpdate({ shell: false })}
-            />
+            <Suspense fallback={<div className="ui-loading p-3">Loading shell…</div>}>
+              <ShellTab
+                agent={agent}
+                isActive={isActive && activeTab === 'shell'}
+                disabled={shellDisabled}
+                apiAddress={apiAddress}
+                onDisabled={() => handleCapUpdate({ shell: false })}
+              />
+            </Suspense>
           </div>
         )}
         {activeTab === 'files' && (
