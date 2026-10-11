@@ -29,6 +29,12 @@ function parseErrFields(err: unknown): { code: unknown; message: string } {
 
 const VIEW_MAX_SIZE = 1024 * 1024; // 1MB
 
+// Cap on DOM rows rendered for a directory listing. The fetch side already
+// stops at MAX_PAGES × PAGE_SIZE entries, but that only bounds memory — a
+// 100k-entry directory would still hang the tab if every row mounted.
+// "Show more" raises the limit in pages.
+const RENDER_PAGE = 500;
+
 const IMAGE_EXTENSIONS = new Set([
   '.png',
   '.jpg',
@@ -326,7 +332,6 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
   const [home, setHome] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(
     null,
   );
@@ -375,6 +380,9 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
   const [rootsPathInput, setRootsPathInput] = useState('');
   const dragCounter = useRef(0);
   const uploadCancelledRef = useRef(false);
+  // Aborts the in-flight XHR of the currently-uploading file; set by the
+  // upload-queue effect, invoked by the Cancel button.
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Flag the panel that a file dialog/menu is open so its own Escape handler
@@ -386,6 +394,9 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
   onDisabledRef.current = onDisabled;
 
   const [truncated, setTruncated] = useState<{ shown: number; total: number } | null>(null);
+  // How many listing rows are actually rendered (see RENDER_PAGE). Reset
+  // whenever a new listing loads.
+  const [renderLimit, setRenderLimit] = useState(RENDER_PAGE);
 
   const mapAuthErrorMessage = useCallback((err: unknown): string | null => {
     const { code, message } = parseErrFields(err);
@@ -480,6 +491,7 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setRenderLimit(RENDER_PAGE);
     const PAGE_SIZE = 5000;
     const MAX_PAGES = 20; // cap at 100,000 entries
     (async () => {
@@ -547,35 +559,14 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
     [agent.id, mapAuthErrorMessage],
   );
 
-  const handleUpload = useCallback(
-    async (file: File) => {
-      if (!currentPath) return;
-      const remotePath = joinPath(currentPath, file.name);
-      setUploading(true);
-      setUploadMsg(null);
-      let succeeded = false;
-      try {
-        await uploadFile(agent.id, file, remotePath);
-        setUploadMsg({ type: 'success', text: `Uploaded ${file.name}` });
-        succeeded = true;
-        doRefresh();
-      } catch (err: any) {
-        setUploadMsg({
-          type: 'error',
-          text: mapAuthErrorMessage(err) ?? err.message ?? 'Upload failed',
-        });
-      } finally {
-        setUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    },
-    [agent.id, currentPath, mapAuthErrorMessage, doRefresh],
-  );
-
-  // Batch upload effect — processes uploadQueue sequentially with byte-level progress
+  // Upload effect — processes uploadQueue sequentially with byte-level
+  // progress. Single-file picks go through the same queue so they get
+  // progress reporting and a working Cancel button too.
   useEffect(() => {
     if (!uploadQueue || uploadQueue.length === 0) return;
     uploadCancelledRef.current = false;
+    const abortController = new AbortController();
+    uploadAbortRef.current = abortController;
     let active = true;
 
     (async () => {
@@ -606,20 +597,28 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
           currentName: item.file.name,
         });
         try {
-          await uploadFile(agent.id, item.file, item.remotePath, loaded => {
-            if (!active) return;
-            setUploadProgress({
-              totalFiles,
-              doneFiles,
-              failed,
-              totalBytes,
-              uploadedBytes: baseBytes + loaded,
-              currentName: item.file.name,
-            });
-          });
+          await uploadFile(
+            agent.id,
+            item.file,
+            item.remotePath,
+            loaded => {
+              if (!active) return;
+              setUploadProgress({
+                totalFiles,
+                doneFiles,
+                failed,
+                totalBytes,
+                uploadedBytes: baseBytes + loaded,
+                currentName: item.file.name,
+              });
+            },
+            abortController.signal,
+          );
         } catch {
-          failed++;
+          // An abort is the operator pressing Cancel, not a failure.
+          if (!abortController.signal.aborted) failed++;
         }
+        if (uploadCancelledRef.current) break;
         completedBytes += item.file.size;
         doneFiles++;
       }
@@ -628,6 +627,7 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
       const cancelled = uploadCancelledRef.current;
       const skipped = totalFiles - doneFiles;
 
+      uploadAbortRef.current = null;
       setUploadProgress(null);
       setUploadQueue(null);
       doRefresh();
@@ -646,6 +646,10 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
 
     return () => {
       active = false;
+      // Unmounting mid-upload (panel tab switch, panel close) aborts the
+      // in-flight XHR rather than letting it run to completion invisibly.
+      abortController.abort();
+      if (uploadAbortRef.current === abortController) uploadAbortRef.current = null;
     };
   }, [uploadQueue, agent.id, doRefresh]);
 
@@ -707,7 +711,7 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
         return null;
       });
       const previewable = isPreviewable(name);
-      setViewTab(previewable ? 'preview' : 'preview');
+      setViewTab('preview');
       try {
         const blob = await downloadFile(agent.id, fullPath);
         if (previewable) {
@@ -747,6 +751,20 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
       return null;
     });
   }, []);
+
+  // Revoke the viewer's blob URL on unmount too — the revoke paths above
+  // only cover opening another file or closing the viewer, so switching
+  // panel tabs with a preview open would otherwise leak the object URL.
+  const viewImageUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    viewImageUrlRef.current = viewImageUrl;
+  }, [viewImageUrl]);
+  useEffect(
+    () => () => {
+      if (viewImageUrlRef.current) URL.revokeObjectURL(viewImageUrlRef.current);
+    },
+    [],
+  );
 
   // Close context menu on click outside or Escape
   useEffect(() => {
@@ -1091,15 +1109,13 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
               onChange={e => {
                 const files = e.target.files;
                 if (!files || files.length === 0 || !currentPath) return;
-                if (files.length === 1) {
-                  handleUpload(files[0]);
-                } else {
-                  const queue = Array.from(files).map(f => ({
-                    file: f,
-                    remotePath: joinPath(currentPath, f.name),
-                  }));
-                  setUploadQueue(queue);
-                }
+                // One file or many — always go through the upload queue so
+                // every upload gets progress reporting and a working Cancel.
+                const queue = Array.from(files).map(f => ({
+                  file: f,
+                  remotePath: joinPath(currentPath, f.name),
+                }));
+                setUploadQueue(queue);
                 if (fileInputRef.current) fileInputRef.current.value = '';
               }}
             />
@@ -1109,10 +1125,10 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
             <button
               className="btn btn-xs btn-soft"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || uploadQueue !== null}
+              disabled={uploadQueue !== null}
               title="Upload (or drop files anywhere here)"
             >
-              {uploading || uploadQueue !== null ? 'Uploading…' : 'Upload'}
+              {uploadQueue !== null ? 'Uploading…' : 'Upload'}
             </button>
             <button
               className="btn btn-xs btn-soft"
@@ -1126,12 +1142,15 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
         )}
       </div>
 
-      {/* Batch upload progress */}
+      {/* Upload progress */}
       {uploadProgress && (
         <UploadProgressBar
           progress={uploadProgress}
           onCancel={() => {
             uploadCancelledRef.current = true;
+            // Abort the in-flight XHR immediately instead of waiting for the
+            // current file to finish uploading.
+            uploadAbortRef.current?.abort();
           }}
         />
       )}
@@ -1267,7 +1286,7 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
                   <span className="min-w-0 flex-1 truncate font-mono">..</span>
                 </div>
               )}
-              {entries.map(entry => {
+              {entries.slice(0, renderLimit).map(entry => {
                 const fullPath = entryFullPath(entry);
                 const isDownloading = downloadingPath === fullPath;
                 const canView = !entry.is_dir && entry.size <= VIEW_MAX_SIZE;
@@ -1374,6 +1393,17 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
                   </div>
                 );
               })}
+              {entries.length > renderLimit && (
+                <div className={`${FILE_ROW} justify-center`}>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-soft"
+                    onClick={() => setRenderLimit(limit => limit + RENDER_PAGE)}
+                  >
+                    Show more ({entries.length - renderLimit} hidden)
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>

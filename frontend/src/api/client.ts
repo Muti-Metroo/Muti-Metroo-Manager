@@ -405,6 +405,7 @@ export async function uploadFile(
   file: File,
   remotePath: string,
   onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<{ status: string; message?: string }> {
   const form = new FormData();
   form.append('file', file);
@@ -444,6 +445,16 @@ export async function uploadFile(
         }
       };
       xhr.onerror = () => reject(new Error('Upload failed: network error'));
+      // Abort rejects with an AbortError so callers can distinguish a user
+      // cancel from a genuine upload failure.
+      xhr.onabort = () => reject(new DOMException('Upload aborted', 'AbortError'));
+      if (signal) {
+        if (signal.aborted) {
+          xhr.abort();
+          return;
+        }
+        signal.addEventListener('abort', () => xhr.abort(), { once: true });
+      }
       xhr.send(form);
     });
   }
@@ -452,6 +463,7 @@ export async function uploadFile(
     method: 'POST',
     headers,
     body: form,
+    signal: signal ?? null,
   });
   if (resp.status === 401) {
     if (isManagerAuthResponse(resp.status, resp.headers?.get?.('WWW-Authenticate') ?? null)) {
