@@ -16,9 +16,11 @@ type Proxy struct {
 	longClient *http.Client
 }
 
-// New creates a proxy targeting the given agent URL.
-func New(agentURL, agentToken string) *Proxy {
-	tlsCfg := &tls.Config{InsecureSkipVerify: true}
+// New creates a proxy targeting the given agent URL. tlsCfg configures
+// verification of the agent's certificate for https:// agent URLs; nil
+// means default verification against the system roots (see
+// internal/agenttls for the CA-bundle and insecure variants).
+func New(agentURL, agentToken string, tlsCfg *tls.Config) *Proxy {
 	return &Proxy{
 		agentURL:   strings.TrimRight(agentURL, "/"),
 		agentToken: agentToken,

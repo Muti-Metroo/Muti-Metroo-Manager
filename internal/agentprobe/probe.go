@@ -44,15 +44,15 @@ type Prober struct {
 }
 
 // New creates a Prober for the given agent base URL. timeout bounds
-// the entire request including connection setup. The TLS config
-// matches the proxy's existing posture (InsecureSkipVerify) and will
-// be swapped when verified-TLS lands.
-func New(agentURL, token string, timeout time.Duration) *Prober {
+// the entire request including connection setup. tlsCfg selects the
+// upstream-TLS posture for https:// agent URLs; nil means default
+// verification against the system roots.
+func New(agentURL, token string, timeout time.Duration, tlsCfg *tls.Config) *Prober {
 	return &Prober{
 		client: &http.Client{
 			Timeout: timeout,
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: tlsCfg,
 			},
 		},
 		agent: strings.TrimRight(agentURL, "/"),

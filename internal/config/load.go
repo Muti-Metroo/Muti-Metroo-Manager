@@ -37,21 +37,23 @@ const (
 type LoadFlags struct {
 	fs *flag.FlagSet
 
-	configPath     string
-	addr           string
-	agent          string
-	agentToken     string
-	agentTokenFile string
-	authToken      string
-	authTokenFile  string
-	insecureNoAuth bool
-	dataDir        string
-	downloadsBnd   string
-	noDownloads    bool
-	logLevel       string
-	logFormat      string
-	metricsAddr    string
-	noSounds       bool
+	configPath         string
+	addr               string
+	agent              string
+	agentToken         string
+	agentTokenFile     string
+	agentCABundle      string
+	insecureSkipVerify bool
+	authToken          string
+	authTokenFile      string
+	insecureNoAuth     bool
+	dataDir            string
+	downloadsBnd       string
+	noDownloads        bool
+	logLevel           string
+	logFormat          string
+	metricsAddr        string
+	noSounds           bool
 }
 
 // NewLoadFlags constructs a flag.FlagSet with every Muti Metroo Manager flag
@@ -72,6 +74,10 @@ func NewLoadFlags(name string, errOut io.Writer) *LoadFlags {
 		"bearer token for the agent (prefer -agent-token-file or "+EnvAgentToken+" env)")
 	fs.StringVar(&lf.agentTokenFile, "agent-token-file", "",
 		"path to a file containing the bearer token (single line, trimmed)")
+	fs.StringVar(&lf.agentCABundle, "agent-ca-bundle", "",
+		"path to a PEM file with extra CA certificates for verifying the agent's TLS certificate")
+	fs.BoolVar(&lf.insecureSkipVerify, "insecure-skip-verify", false,
+		"disable TLS certificate verification when talking to the agent (MITM-able; logs a warning)")
 	fs.StringVar(&lf.authToken, "auth-token", "",
 		"bearer token guarding the manager's own /api/* routes (prefer -auth-token-file or "+EnvAuthToken+" env)")
 	fs.StringVar(&lf.authTokenFile, "auth-token-file", "",
@@ -177,6 +183,14 @@ func (lf *LoadFlags) Resolve() (LoadResult, error) {
 	if setFlags["agent-token-file"] {
 		cfg.AgentTokenFile = lf.agentTokenFile
 		src["agent_token_file"] = SourceFlag
+	}
+	if setFlags["agent-ca-bundle"] {
+		cfg.AgentCABundle = lf.agentCABundle
+		src["agent_ca_bundle"] = SourceFlag
+	}
+	if setFlags["insecure-skip-verify"] {
+		cfg.InsecureSkipVerify = lf.insecureSkipVerify
+		src["insecure_skip_verify"] = SourceFlag
 	}
 	if setFlags["auth-token"] {
 		cfg.AuthToken = lf.authToken
@@ -285,6 +299,10 @@ func applyFileLayer(cfg *Config, src Source, m map[string]any) error {
 			err = strField(k, &cfg.Agent, v)
 		case "agent_token_file":
 			err = strField(k, &cfg.AgentTokenFile, v)
+		case "agent_ca_bundle":
+			err = strField(k, &cfg.AgentCABundle, v)
+		case "insecure_skip_verify":
+			err = boolField(k, &cfg.InsecureSkipVerify, v)
 		case "auth_token_file":
 			err = strField(k, &cfg.AuthTokenFile, v)
 		case "insecure_no_auth":

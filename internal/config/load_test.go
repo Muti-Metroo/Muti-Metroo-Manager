@@ -424,3 +424,54 @@ func TestFileRejectsAuthTokenInline(t *testing.T) {
 		t.Fatalf("expected auth_token-in-file rejection, got %v", err)
 	}
 }
+
+func TestAgentTLSFlags(t *testing.T) {
+	t.Setenv(EnvAgentToken, "")
+	t.Setenv(EnvAgentTokenLegacy, "")
+	t.Setenv(EnvAuthToken, "")
+	lf := NewLoadFlags("test", &bytes.Buffer{})
+	if err := lf.Parse([]string{"-agent-ca-bundle", "/etc/mmm/ca.pem", "-insecure-skip-verify"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	res, err := lf.Resolve()
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if res.Config.AgentCABundle != "/etc/mmm/ca.pem" {
+		t.Errorf("AgentCABundle = %q", res.Config.AgentCABundle)
+	}
+	if !res.Config.InsecureSkipVerify {
+		t.Error("InsecureSkipVerify = false, want true")
+	}
+	if res.Source["agent_ca_bundle"] != SourceFlag || res.Source["insecure_skip_verify"] != SourceFlag {
+		t.Errorf("sources = %q/%q, want flag/flag",
+			res.Source["agent_ca_bundle"], res.Source["insecure_skip_verify"])
+	}
+}
+
+func TestFileLayerAgentTLSKeys(t *testing.T) {
+	t.Setenv(EnvAgentToken, "")
+	t.Setenv(EnvAgentTokenLegacy, "")
+	t.Setenv(EnvAuthToken, "")
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.toml")
+	body := "agent_ca_bundle = \"/etc/mmm/ca.pem\"\ninsecure_skip_verify = true\n"
+	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lf := NewLoadFlags("test", &bytes.Buffer{})
+	if err := lf.Parse([]string{"-config", cfgPath}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	res, err := lf.Resolve()
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if res.Config.AgentCABundle != "/etc/mmm/ca.pem" || !res.Config.InsecureSkipVerify {
+		t.Errorf("got %+v", res.Config)
+	}
+	if res.Source["agent_ca_bundle"] != SourceFile || res.Source["insecure_skip_verify"] != SourceFile {
+		t.Errorf("sources = %q/%q, want file/file",
+			res.Source["agent_ca_bundle"], res.Source["insecure_skip_verify"])
+	}
+}

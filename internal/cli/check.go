@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/postalsys/muti-metroo-manager/internal/agentprobe"
+	"github.com/postalsys/muti-metroo-manager/internal/agenttls"
 	"github.com/postalsys/muti-metroo-manager/internal/config"
 	"github.com/postalsys/muti-metroo-manager/internal/downloads"
 )
@@ -64,7 +66,15 @@ func runCheck(args []string, build Build, stdout, stderr io.Writer) int {
 	}
 
 	// 3. Agent reachability.
-	agentStatus, agentDetail := probeAgent(res.Config.Agent, res.Config.AgentToken)
+	agentTLS, err := agenttls.Config(res.Config.AgentCABundle, res.Config.InsecureSkipVerify)
+	if err != nil {
+		fmt.Fprintf(stdout, "agent:    FAIL  TLS config: %v\n", err)
+		return 1
+	}
+	if res.Config.InsecureSkipVerify {
+		fmt.Fprintln(stdout, "warn: TLS verification of the agent is disabled (insecure_skip_verify)")
+	}
+	agentStatus, agentDetail := probeAgent(res.Config.Agent, res.Config.AgentToken, agentTLS)
 	if agentStatus {
 		fmt.Fprintf(stdout, "agent:    OK    %s (%s)\n", res.Config.Agent, agentDetail)
 	} else {
@@ -100,8 +110,8 @@ func probeDataDir(dir string) error {
 // probeAgent runs a single /healthz request through the shared
 // Prober. The 5s budget belongs to the http.Client; an extra
 // context.WithTimeout on top would just duplicate that.
-func probeAgent(agentURL, token string) (bool, string) {
-	r := agentprobe.New(agentURL, token, 5*time.Second).Health(context.Background())
+func probeAgent(agentURL, token string, tlsCfg *tls.Config) (bool, string) {
+	r := agentprobe.New(agentURL, token, 5*time.Second, tlsCfg).Health(context.Background())
 	if !r.Reachable {
 		if r.Error != "" {
 			return false, r.Error

@@ -80,6 +80,10 @@ func fieldValue(cfg config.Config, key string) any {
 		return cfg.AgentToken
 	case "agent_token_file":
 		return cfg.AgentTokenFile
+	case "agent_ca_bundle":
+		return cfg.AgentCABundle
+	case "insecure_skip_verify":
+		return cfg.InsecureSkipVerify
 	case "auth_token":
 		return cfg.AuthToken
 	case "auth_token_file":

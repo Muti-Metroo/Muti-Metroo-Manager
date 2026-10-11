@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
@@ -27,6 +28,11 @@ type Options struct {
 	Store      *store.Store
 	Bundle     *downloads.Bundle
 	Version    string
+
+	// TLSConfig configures verification of the agent's certificate for
+	// https:// agent URLs (nil = system roots). Built by cmd/manager
+	// via internal/agenttls and shared with the agent prober.
+	TLSConfig *tls.Config
 
 	// AuthToken, when non-empty, gates every /api/* route (including
 	// /api/proxy/*) behind a bearer token / session cookie — see
@@ -73,7 +79,7 @@ func New(opts Options) (*http.Server, SeedHealthFunc) {
 	}
 
 	mux := http.NewServeMux()
-	p := proxy.New(opts.AgentURL, opts.AgentToken)
+	p := proxy.New(opts.AgentURL, opts.AgentToken, opts.TLSConfig)
 
 	hc := newHealthCache(opts.AgentProber, opts.Version)
 	mux.Handle("/healthz", healthzHandler(hc))

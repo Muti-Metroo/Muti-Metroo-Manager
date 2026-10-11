@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/postalsys/muti-metroo-manager/internal/agentprobe"
+	"github.com/postalsys/muti-metroo-manager/internal/agenttls"
 	"github.com/postalsys/muti-metroo-manager/internal/cli"
 	"github.com/postalsys/muti-metroo-manager/internal/config"
 	"github.com/postalsys/muti-metroo-manager/internal/downloads"
@@ -100,7 +101,19 @@ func runServer(args []string) int {
 	bundle, bundleSrc, bundleDisabled := openDownloadsBundle(cfg, logger)
 	defer bundle.Close()
 
-	prober := agentprobe.New(cfg.Agent, cfg.AgentToken, 5*time.Second)
+	agentTLS, err := agenttls.Config(cfg.AgentCABundle, cfg.InsecureSkipVerify)
+	if err != nil {
+		logger.Error("agent TLS config", slog.String("err", err.Error()))
+		return 1
+	}
+	if cfg.InsecureSkipVerify {
+		logger.Warn("TLS certificate verification for the agent is DISABLED (-insecure-skip-verify): "+
+			"the agent bearer token is MITM-able over https agent URLs — prefer -agent-ca-bundle",
+			slog.String("agent", cfg.Agent),
+		)
+	}
+
+	prober := agentprobe.New(cfg.Agent, cfg.AgentToken, 5*time.Second, agentTLS)
 	// Run the probe concurrently so a slow/unreachable agent doesn't
 	// add 5s to startup. The banner waits up to 1s for a fresh
 	// answer; anything later is an "unknown" result the operator can
@@ -118,6 +131,7 @@ func runServer(args []string) int {
 		AgentURL:     cfg.Agent,
 		AgentToken:   cfg.AgentToken,
 		AuthToken:    cfg.AuthToken,
+		TLSConfig:    agentTLS,
 		Store:        st,
 		Bundle:       bundle,
 		Version:      Version,

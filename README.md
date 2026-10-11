@@ -95,6 +95,8 @@ per-field provenance.
 | `-agent` | `http://127.0.0.1:8080` | Muti Metroo agent URL to proxy to |
 | `-agent-token` | — | Bearer token for agent API authentication. Visible via `/proc/<pid>/cmdline`; prefer `-agent-token-file` or `METROO_MANAGER_AGENT_TOKEN` |
 | `-agent-token-file` | — | File containing the bearer token (single line, trimmed). Recommended for production. |
+| `-agent-ca-bundle` | — | PEM file with extra CA certificates for verifying the agent's TLS certificate (for `https://` agent URLs with self-signed/private-CA certs) |
+| `-insecure-skip-verify` | `false` | Disable TLS verification of the agent (the agent token becomes MITM-able; logs a startup warning — prefer `-agent-ca-bundle`) |
 | `-auth-token` | — | Manager's own access token guarding all `/api/*` routes. Visible via `/proc/<pid>/cmdline`; prefer `-auth-token-file` or `METROO_MANAGER_AUTH_TOKEN` |
 | `-auth-token-file` | — | File containing the manager auth token (single line, trimmed). Recommended for production. |
 | `-insecure-no-auth` | `false` | Allow binding a non-loopback address with no manager auth token (dangerous) |
@@ -112,6 +114,13 @@ Windows: `%LOCALAPPDATA%\muti-metroo-manager`.
 The legacy `-downloads-bundle off` sentinel still works for
 backwards compatibility but logs a deprecation warning — use
 `-no-downloads` instead.
+
+When `-agent` is an `https://` URL, the agent's certificate is
+**verified against the system roots by default**. For agents with
+self-signed or private-CA certificates, point `-agent-ca-bundle` at the
+signing CA's PEM file; `-insecure-skip-verify` exists only as an
+explicit escape hatch and logs a warning, since the bearer token sent
+to the agent is otherwise MITM-able.
 
 ### Environment variables
 

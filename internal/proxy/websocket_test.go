@@ -53,7 +53,7 @@ func TestWebSocketEchoRoundTrip(t *testing.T) {
 			}
 		}
 	})
-	p := httptest.NewServer(New(agent.URL, ""))
+	p := httptest.NewServer(New(agent.URL, "", nil))
 	t.Cleanup(p.Close)
 
 	c := dialProxyWS(t, p.URL)
@@ -82,7 +82,7 @@ func TestWebSocketClientDisconnectClosesAgentSide(t *testing.T) {
 			}
 		}
 	})
-	p := httptest.NewServer(New(agent.URL, ""))
+	p := httptest.NewServer(New(agent.URL, "", nil))
 	t.Cleanup(p.Close)
 
 	c := dialProxyWS(t, p.URL)
@@ -101,7 +101,7 @@ func TestWebSocketAgentDisconnectClosesClientSide(t *testing.T) {
 	agent, _ := startFakeAgent(t, func(conn *websocket.Conn) {
 		// Die immediately without reading anything.
 	})
-	p := httptest.NewServer(New(agent.URL, ""))
+	p := httptest.NewServer(New(agent.URL, "", nil))
 	t.Cleanup(p.Close)
 
 	c := dialProxyWS(t, p.URL)

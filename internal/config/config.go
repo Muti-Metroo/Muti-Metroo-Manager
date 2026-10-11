@@ -31,6 +31,17 @@ type Config struct {
 	// via /proc/<pid>/cmdline on multi-tenant hosts.
 	AgentTokenFile string `toml:"agent_token_file"`
 
+	// AgentCABundle is the path to a PEM file with additional CA
+	// certificates for verifying the agent's TLS certificate. The
+	// supported way to reach agents with self-signed or private-CA
+	// certificates over https:// agent URLs.
+	AgentCABundle string `toml:"agent_ca_bundle"`
+
+	// InsecureSkipVerify disables TLS certificate verification when
+	// talking to the agent. Escape hatch only — the token sent to the
+	// agent becomes MITM-able. Startup logs a loud warning.
+	InsecureSkipVerify bool `toml:"insecure_skip_verify"`
+
 	// AuthToken guards the manager's own /api/* routes (including the
 	// agent proxy). Resolved like AgentToken: -auth-token flag,
 	// METROO_MANAGER_AUTH_TOKEN env var, then AuthTokenFile. Empty means
@@ -88,20 +99,22 @@ type Config struct {
 // arbitrary CWD doesn't leak into the SQLite path.
 func Defaults() Config {
 	return Config{
-		Addr:            ":3000",
-		Agent:           "http://127.0.0.1:8080",
-		AgentToken:      "",
-		AgentTokenFile:  "",
-		AuthToken:       "",
-		AuthTokenFile:   "",
-		InsecureNoAuth:  false,
-		DataDir:         DefaultDataDir(),
-		DownloadsBundle: "",
-		NoDownloads:     false,
-		LogLevel:        "info",
-		LogFormat:       "text",
-		MetricsAddr:     "",
-		NoSounds:        false,
+		Addr:               ":3000",
+		Agent:              "http://127.0.0.1:8080",
+		AgentToken:         "",
+		AgentTokenFile:     "",
+		AgentCABundle:      "",
+		InsecureSkipVerify: false,
+		AuthToken:          "",
+		AuthTokenFile:      "",
+		InsecureNoAuth:     false,
+		DataDir:            DefaultDataDir(),
+		DownloadsBundle:    "",
+		NoDownloads:        false,
+		LogLevel:           "info",
+		LogFormat:          "text",
+		MetricsAddr:        "",
+		NoSounds:           false,
 	}
 }
 
@@ -126,6 +139,8 @@ var allFields = []string{
 	"agent",
 	"agent_token",
 	"agent_token_file",
+	"agent_ca_bundle",
+	"insecure_skip_verify",
 	"auth_token",
 	"auth_token_file",
 	"insecure_no_auth",

@@ -90,6 +90,16 @@ agent = %q
 # environment (which is visible to anything that can read /proc/environ).
 agent_token_file = %q
 
+# Path to a PEM file with additional CA certificates used to verify
+# the agent's TLS certificate. The supported way to reach agents with
+# self-signed or private-CA certificates over an https:// agent URL.
+agent_ca_bundle = %q
+
+# Disable TLS certificate verification when talking to the agent.
+# Escape hatch only: the bearer token sent to the agent becomes
+# MITM-able. Startup logs a loud warning; prefer agent_ca_bundle.
+insecure_skip_verify = %t
+
 # Path to a file containing the manager's own auth token. When set,
 # every /api/* route (including the agent proxy, remote shell, and
 # file transfer) requires an Authorization: Bearer header or the
@@ -132,6 +142,8 @@ metrics_addr = %q
 		d.Addr,
 		d.Agent,
 		d.AgentTokenFile,
+		d.AgentCABundle,
+		d.InsecureSkipVerify,
 		d.AuthTokenFile,
 		d.InsecureNoAuth,
 		d.DataDir,

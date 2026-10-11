@@ -22,7 +22,7 @@ func TestWebSocketCheckOrigin(t *testing.T) {
 			}
 		}
 	})
-	p := httptest.NewServer(New(agent.URL, ""))
+	p := httptest.NewServer(New(agent.URL, "", nil))
 	t.Cleanup(p.Close)
 
 	wsURL := strings.Replace(p.URL, "http://", "ws://", 1) + "/api/proxy/ws"
