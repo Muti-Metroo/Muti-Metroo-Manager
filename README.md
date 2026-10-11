@@ -2,7 +2,7 @@
 
 Web-based management UI for Muti Metroo mesh networks. Provides a real-time SVG metro-map topology view, monitoring, remote shell access, file transfer, route management, mesh testing, and sleep/wake cluster control.
 
-**Documentation:** https://github.com/postalsys/Muti-Metroo-Manager/
+**Documentation:** https://github.com/Muti-Metroo/Muti-Metroo-Manager/
 
 ## Features
 

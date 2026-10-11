@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/postalsys/muti-metroo-manager/internal/metrics"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/metrics"
 )
 
 // instrumentation bundles the per-request metrics so middleware

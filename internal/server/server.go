@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/postalsys/muti-metroo-manager/internal/agentprobe"
-	"github.com/postalsys/muti-metroo-manager/internal/downloads"
-	"github.com/postalsys/muti-metroo-manager/internal/metrics"
-	"github.com/postalsys/muti-metroo-manager/internal/proxy"
-	"github.com/postalsys/muti-metroo-manager/internal/store"
-	"github.com/postalsys/muti-metroo-manager/internal/webui"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agentprobe"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/downloads"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/metrics"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/proxy"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/store"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/webui"
 )
 
 // Options bundles the runtime configuration server.New needs.

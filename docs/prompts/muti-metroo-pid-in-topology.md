@@ -1,6 +1,6 @@
 # Muti Metroo: expose agent PID in topology response
 
-You are working on the **Muti Metroo agent** (Go) at `github.com/postalsys/muti-metroo` (sibling repo to Muti-Metroo-Manager; in this dev tree it's at `../Muti-Metroo` from Muti-Metroo-Manager). Do **not** edit Muti-Metroo-Manager — that repo is consuming this change in a parallel session.
+You are working on the **Muti Metroo agent** (Go) at `github.com/Muti-Metroo/Muti-Metroo` (sibling repo to Muti-Metroo-Manager; in this dev tree it's at `../Muti-Metroo` from Muti-Metroo-Manager). Do **not** edit Muti-Metroo-Manager — that repo is consuming this change in a parallel session.
 
 ## Why this is needed
 

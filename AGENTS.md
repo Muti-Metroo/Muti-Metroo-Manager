@@ -1,6 +1,6 @@
 # AGENTS.md — Muti Metroo Manager
 
-Web-based management UI ("Muti Metroo Manager") for [Muti Metroo](https://github.com/postalsys/muti-metroo)
+Web-based management UI ("Muti Metroo Manager") for [Muti Metroo](https://github.com/Muti-Metroo/Muti-Metroo)
 mesh networks. A minimal Go backend reverse-proxies browser requests to a Muti Metroo
 agent's HTTP API (`/api/proxy/*` is stripped of the prefix and forwarded, HTTP and
 WebSocket) and serves an embedded React SPA with a real-time SVG metro-map topology

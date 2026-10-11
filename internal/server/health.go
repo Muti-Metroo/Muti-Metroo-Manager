@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/postalsys/muti-metroo-manager/internal/agentprobe"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agentprobe"
 )
 
 // healthCache periodically probes the agent so /healthz can answer in

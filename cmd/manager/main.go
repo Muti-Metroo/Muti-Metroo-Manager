@@ -12,15 +12,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/postalsys/muti-metroo-manager/internal/agentprobe"
-	"github.com/postalsys/muti-metroo-manager/internal/agenttls"
-	"github.com/postalsys/muti-metroo-manager/internal/cli"
-	"github.com/postalsys/muti-metroo-manager/internal/config"
-	"github.com/postalsys/muti-metroo-manager/internal/downloads"
-	"github.com/postalsys/muti-metroo-manager/internal/logging"
-	"github.com/postalsys/muti-metroo-manager/internal/metrics"
-	"github.com/postalsys/muti-metroo-manager/internal/server"
-	"github.com/postalsys/muti-metroo-manager/internal/store"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agentprobe"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agenttls"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/cli"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/config"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/downloads"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/logging"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/metrics"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/server"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/store"
 )
 
 // Version is stamped in by the linker via -ldflags "-X main.Version=...".

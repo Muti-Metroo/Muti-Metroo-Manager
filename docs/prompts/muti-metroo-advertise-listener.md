@@ -1,6 +1,6 @@
 # Muti Metroo: advertise each agent's dial-target listener over NodeInfo
 
-You are working on the **Muti Metroo agent** (Go) at `github.com/postalsys/muti-metroo` (sibling repo to Muti-Metroo-Manager; in this dev tree it's at `../Muti-Metroo` from Muti-Metroo-Manager). Do **not** edit Muti-Metroo-Manager — that repo is consuming this change in a parallel session.
+You are working on the **Muti Metroo agent** (Go) at `github.com/Muti-Metroo/Muti-Metroo` (sibling repo to Muti-Metroo-Manager; in this dev tree it's at `../Muti-Metroo` from Muti-Metroo-Manager). Do **not** edit Muti-Metroo-Manager — that repo is consuming this change in a parallel session.
 
 ## Why this is needed
 
@@ -79,7 +79,7 @@ Pass through verbatim from each NodeInfo. The local agent should also include it
 
 ### 5. Documentation
 
-If `github.com/postalsys/Muti-Metroo-Manager/` (or the agent's own docs site) has a config reference, add a section for `listeners[].advertise`. One paragraph + the YAML example above is enough.
+If `github.com/Muti-Metroo/Muti-Metroo-Manager/` (or the agent's own docs site) has a config reference, add a section for `listeners[].advertise`. One paragraph + the YAML example above is enough.
 
 ## Out of scope
 

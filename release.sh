@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR"
 # --- Configuration ---
 API_URL="https://api.github.com"
 UPLOAD_URL="https://uploads.github.com"
-REPO="postalsys/Muti-Metroo-Manager"
+REPO="Muti-Metroo/Muti-Metroo-Manager"
 VERSION_FILE="VERSION"
 BINARY="muti-metroo-manager"
 TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN env var is required}"

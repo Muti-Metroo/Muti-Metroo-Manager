@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/postalsys/muti-metroo-manager/internal/config"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/config"
 )
 
 // runConfigInit emits a commented TOML template. With no path it

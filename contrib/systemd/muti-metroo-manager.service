@@ -19,7 +19,7 @@
 
 [Unit]
 Description=Muti Metroo Manager management UI
-Documentation=https://github.com/postalsys/Muti-Metroo-Manager/
+Documentation=https://github.com/Muti-Metroo/Muti-Metroo-Manager/
 After=network-online.target
 Wants=network-online.target
 

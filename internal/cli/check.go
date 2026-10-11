@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/postalsys/muti-metroo-manager/internal/agentprobe"
-	"github.com/postalsys/muti-metroo-manager/internal/agenttls"
-	"github.com/postalsys/muti-metroo-manager/internal/config"
-	"github.com/postalsys/muti-metroo-manager/internal/downloads"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agentprobe"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agenttls"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/config"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/downloads"
 )
 
 // runCheck validates config, probes the data dir, and pings

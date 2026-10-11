@@ -1,10 +1,10 @@
 # Muti Metroo Manager — Claude Code Instructions
 
-**Documentation:** https://github.com/postalsys/Muti-Metroo-Manager/
+**Documentation:** https://github.com/Muti-Metroo/Muti-Metroo-Manager/
 
 ## Muti Metroo (the agent)
 
-**Source:** `../Muti-Metroo` (`github.com/postalsys/muti-metroo`)
+**Source:** `../Muti-Metroo` (`github.com/Muti-Metroo/Muti-Metroo`)
 
 Userspace mesh networking agent. Creates encrypted TCP tunnels over QUIC/HTTP2/WebSocket transports. Multi-hop routing with SOCKS5 ingress and CIDR-based exit routing. E2E encryption (X25519 + ChaCha20-Poly1305) — transit nodes can't decrypt payload.
 
@@ -320,7 +320,7 @@ Linux (amd64+arm64) and Windows amd64 binaries are compressed with UPX. Darwin b
 - `VERSION` is bumped by release-please's release PR (or by `release.sh` for a manual binary release) — do not edit it manually
 - Git tags follow the format `v{VERSION}` (e.g., `v0.2.0`)
 
-**Binaries location**: https://github.com/postalsys/Muti-Metroo-Manager/releases
+**Binaries location**: https://github.com/Muti-Metroo/Muti-Metroo-Manager/releases
 
 ## Common Tasks
 

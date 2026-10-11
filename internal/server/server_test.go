@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/postalsys/muti-metroo-manager/internal/metrics"
-	"github.com/postalsys/muti-metroo-manager/internal/store"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/metrics"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/store"
 )
 
 // Regression: both listeners must carry Slowloris timeouts.

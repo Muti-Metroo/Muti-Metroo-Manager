@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/postalsys/muti-metroo-manager/internal/config"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/config"
 )
 
 // runConfigShow implements `muti-metroo-manager config show`. It prints the

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/postalsys/muti-metroo-manager/internal/agenttls"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agenttls"
 )
 
 // Regression: probing an https agent must verify the certificate by
