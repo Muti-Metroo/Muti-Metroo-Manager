@@ -58,6 +58,7 @@ import DownloadsTab from './components/DownloadsTab';
 import DnsTab from './components/DnsTab';
 import { useUrlState, type MajorTab } from './router';
 import { isModalOpen } from './hooks/useModalDismiss';
+import { useVisibilityPolling } from './hooks/useVisibilityPolling';
 
 const POLL_INTERVAL = 5000;
 const MESH_TEST_INTERVAL = 60000;
@@ -154,7 +155,13 @@ export default function App() {
     animatedAgentIdsRef.current.add(shortId);
   }, []);
 
+  // In-flight guard: a poll round-trip slower than POLL_INTERVAL must not
+  // overlap the next tick — overlapping Promise.all rounds can resolve out
+  // of order and let an older response clobber newer state.
+  const refreshInFlightRef = useRef(false);
   const refresh = useCallback(async () => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     setPolling(true);
     try {
       const [dash, topo] = await Promise.all([getDashboard(), getTopology()]);
@@ -164,6 +171,7 @@ export default function App() {
     } catch (err) {
       console.error('Failed to refresh dashboard:', err);
     } finally {
+      refreshInFlightRef.current = false;
       setPolling(false);
     }
   }, []);
@@ -187,12 +195,11 @@ export default function App() {
     }
   }, []);
 
-  // Initial load + polling
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_INTERVAL);
-    return () => clearInterval(id);
-  }, [refresh]);
+  // Initial load + polling. Gated on tab visibility: a backgrounded tab
+  // keeps its last-known state (the favicon health dot included — it is
+  // rendered from the most recent poll, so it simply goes stale while
+  // hidden rather than updating) and catches up on return.
+  useVisibilityPolling(refresh, POLL_INTERVAL);
 
   // Settings are operator-set overrides for the advertised API / SOCKS
   // addresses. Fetched once on mount; the settings dialog refreshes this
@@ -305,11 +312,7 @@ export default function App() {
   const resolvedSocks = settings.socks_address || defaultSocksAddress;
 
   // Mesh test polling
-  useEffect(() => {
-    runMeshTest();
-    const id = setInterval(runMeshTest, MESH_TEST_INTERVAL);
-    return () => clearInterval(id);
-  }, [runMeshTest]);
+  useVisibilityPolling(runMeshTest, MESH_TEST_INTERVAL);
 
   // Auto-clear the global sleep error banner after a few seconds; the
   // user can still dismiss earlier with the X. Matches the auto-close
@@ -321,11 +324,7 @@ export default function App() {
   }, [sleepError]);
 
   // Sleep status polling
-  useEffect(() => {
-    refreshSleepStatus();
-    const id = setInterval(refreshSleepStatus, SLEEP_POLL_INTERVAL);
-    return () => clearInterval(id);
-  }, [refreshSleepStatus]);
+  useVisibilityPolling(refreshSleepStatus, SLEEP_POLL_INTERVAL);
 
   // Listen for auth-required events from API client
   useEffect(() => {
