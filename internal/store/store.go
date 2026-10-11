@@ -206,6 +206,9 @@ func (s *Store) GetAgentMetadata() (map[string]AgentMeta, error) {
 	return out, rows.Err()
 }
 
+// maxNoteLen bounds an agent note; longer notes are truncated.
+const maxNoteLen = 4096
+
 // UpdateAgentMetadata persists meta for agentID. When both note and
 // icon are empty the row is deleted so the frontend indicator
 // disappears.
@@ -218,6 +221,10 @@ func (s *Store) UpdateAgentMetadata(agentID string, meta AgentMeta) error {
 	}
 	if !isNetworks(meta.Networks) {
 		return fmt.Errorf("%w: %q", ErrInvalidNetworks, meta.Networks)
+	}
+	// Truncate by runes, not bytes, so a multibyte character isn't split.
+	if runes := []rune(meta.Note); len(runes) > maxNoteLen {
+		meta.Note = string(runes[:maxNoteLen])
 	}
 	if meta.Note == "" && meta.Icon == "" && meta.Networks == "" {
 		_, err := s.db.Exec(`DELETE FROM agent_notes WHERE agent_id = ?`, agentID)

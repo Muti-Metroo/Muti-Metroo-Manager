@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -132,5 +133,39 @@ func TestPositionsValidation(t *testing.T) {
 	}
 	if err := s.ReplacePositions(map[string]Position{"ok": {X: math.Inf(1), Y: 0}}); !errors.Is(err, ErrInvalidPosition) {
 		t.Errorf("non-finite: err = %v, want ErrInvalidPosition", err)
+	}
+}
+
+func TestAgentNoteTruncation(t *testing.T) {
+	s := openTestStore(t)
+	const id = "0123456789abcdef0123456789abcdef"
+
+	long := strings.Repeat("é", maxNoteLen+100) // multibyte: catches byte-wise truncation
+	if err := s.UpdateAgentMetadata(id, AgentMeta{Note: long}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	got, err := s.GetAgentMetadata()
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	note := got[id].Note
+	if runes := []rune(note); len(runes) != maxNoteLen {
+		t.Errorf("note length = %d runes, want %d", len(runes), maxNoteLen)
+	}
+	if !strings.HasPrefix(long, note) {
+		t.Error("truncated note is not a prefix of the input (split rune?)")
+	}
+
+	// Notes at or under the cap pass through untouched.
+	short := strings.Repeat("x", maxNoteLen)
+	if err := s.UpdateAgentMetadata(id, AgentMeta{Note: short}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	got, err = s.GetAgentMetadata()
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got[id].Note != short {
+		t.Errorf("note at cap was modified: %d bytes", len(got[id].Note))
 	}
 }

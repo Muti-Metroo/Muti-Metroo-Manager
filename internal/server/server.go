@@ -173,7 +173,11 @@ func settingsHandler(st *store.Store, logger *slog.Logger, soundsLocked bool) ht
 			writeJSON(w, http.StatusOK, clamp(s))
 		case http.MethodPut:
 			var in store.Settings
-			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			if err := decodeJSON(w, r, &in); err != nil {
+				if errors.Is(err, errBodyTooLarge) {
+					http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+					return
+				}
 				http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 				return
 			}
@@ -235,7 +239,11 @@ func agentMetaItemHandler(st *store.Store, logger *slog.Logger) http.Handler {
 			return
 		}
 		var in store.AgentMeta
-		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		if err := decodeJSON(w, r, &in); err != nil {
+			if errors.Is(err, errBodyTooLarge) {
+				http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -296,7 +304,11 @@ func networkItemHandler(st *store.Store, logger *slog.Logger) http.Handler {
 		var in struct {
 			Name string `json:"name"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		if err := decodeJSON(w, r, &in); err != nil {
+			if errors.Is(err, errBodyTooLarge) {
+				http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -335,7 +347,11 @@ func positionsHandler(st *store.Store, logger *slog.Logger) http.Handler {
 			writeJSON(w, http.StatusOK, positions)
 		case http.MethodPut:
 			var in map[string]store.Position
-			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			if err := decodeJSON(w, r, &in); err != nil {
+				if errors.Is(err, errBodyTooLarge) {
+					http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+					return
+				}
 				http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 				return
 			}
@@ -418,4 +434,24 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
+}
+
+// maxJSONBody caps every JSON-decoding endpoint at 1MB — comfortably
+// above any legitimate payload (settings, notes, position maps) so a
+// client can't grow memory/disk unboundedly through the API.
+const maxJSONBody = 1 << 20
+
+// errBodyTooLarge marks a MaxBytesReader rejection so handlers can map
+// it to 413 instead of the generic 400 for malformed JSON.
+var errBodyTooLarge = errors.New("request body too large")
+
+// decodeJSON reads a single JSON value from r.Body, bounded by
+// maxJSONBody via http.MaxBytesReader.
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst interface{}) error {
+	err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBody)).Decode(dst)
+	var mbe *http.MaxBytesError
+	if errors.As(err, &mbe) {
+		return errBodyTooLarge
+	}
+	return err
 }

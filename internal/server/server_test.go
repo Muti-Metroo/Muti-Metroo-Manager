@@ -1,10 +1,15 @@
 package server
 
 import (
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/postalsys/muti-metroo-manager/internal/metrics"
+	"github.com/postalsys/muti-metroo-manager/internal/store"
 )
 
 // Regression: both listeners must carry Slowloris timeouts.
@@ -34,5 +39,46 @@ func TestServerTimeouts(t *testing.T) {
 	}
 	if mSrv.WriteTimeout != 0 {
 		t.Errorf("metrics WriteTimeout = %v, want 0", mSrv.WriteTimeout)
+	}
+}
+
+// Regression: JSON-decoding endpoints must reject oversized bodies
+// with 413 rather than reading unbounded input.
+func TestMaxJSONBody(t *testing.T) {
+	huge := `{"note":"` + strings.Repeat("x", maxJSONBody) + `"}`
+
+	st, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+
+	cases := []struct {
+		name    string
+		handler http.Handler
+		path    string
+	}{
+		{"settings", settingsHandler(st, slog.Default(), false), "/api/settings"},
+		{"agent-meta", agentMetaItemHandler(st, slog.Default()), "/api/agent-meta/0123456789abcdef0123456789abcdef"},
+		{"networks", networkItemHandler(st, slog.Default()), "/api/networks/prod"},
+		{"positions", positionsHandler(st, slog.Default()), "/api/positions"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name+" rejects oversized body", func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPut, tc.path, strings.NewReader(huge))
+			rec := httptest.NewRecorder()
+			tc.handler.ServeHTTP(rec, r)
+			if rec.Code != http.StatusRequestEntityTooLarge {
+				t.Fatalf("status = %d, want 413", rec.Code)
+			}
+		})
+		t.Run(tc.name+" accepts normal body", func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPut, tc.path, strings.NewReader(`{}`))
+			rec := httptest.NewRecorder()
+			tc.handler.ServeHTTP(rec, r)
+			if rec.Code == http.StatusRequestEntityTooLarge {
+				t.Fatal("small body rejected as too large")
+			}
+		})
 	}
 }
