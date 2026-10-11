@@ -39,6 +39,7 @@ import ForwardRouteTable from './components/ForwardRouteTable';
 import Tabs from './components/Tabs';
 import Footer from './components/Footer';
 import AgentPanel from './components/AgentPanel/AgentPanel';
+import ErrorBoundary from './components/ErrorBoundary';
 import AgentPanelDivider from './components/AgentPanelDivider';
 import AgentSearch, { type AgentSearchHandle } from './components/AgentSearch';
 import TestResultsModal from './components/TestResultsModal';
@@ -805,28 +806,31 @@ export default function App() {
       />
 
       {openedAgents.map(agent => (
-        <AgentPanel
-          key={agent.short_id}
-          agent={agent}
-          isActive={selectedAgentId === agent.short_id}
-          activeTab={agentPanel ?? 'info'}
-          onTabChange={setAgentPanel}
-          meshResult={meshTest?.results?.find(r => r.short_id === agent.short_id)}
-          capabilities={capabilityCacheRef.current.get(agent.short_id) || DEFAULT_CAPABILITIES}
-          canSignManagement={dashboard?.stats?.can_sign_management ?? null}
-          apiAddress={resolvedApi}
-          socksAddress={resolvedSocks}
-          meta={agentMeta[agent.id] ?? EMPTY_AGENT_META}
-          onMetaChange={handleMetaChange}
-          networks={networks}
-          allForwardKeys={allForwardKeys}
-          agentsById={agentsById}
-          onCapabilityUpdate={handleCapabilityUpdate}
-          onMeshChanged={refresh}
-          onClose={() => handleClosePanel(agent.short_id)}
-          animate={openedAgents.length <= 1 && !animatedAgentIdsRef.current.has(agent.short_id)}
-          onAnimated={handleAgentAnimated}
-        />
+        // Per-panel boundary: a render failure in one panel must not take
+        // down the whole dashboard.
+        <ErrorBoundary key={agent.short_id} label="agent panel">
+          <AgentPanel
+            agent={agent}
+            isActive={selectedAgentId === agent.short_id}
+            activeTab={agentPanel ?? 'info'}
+            onTabChange={setAgentPanel}
+            meshResult={meshTest?.results?.find(r => r.short_id === agent.short_id)}
+            capabilities={capabilityCacheRef.current.get(agent.short_id) || DEFAULT_CAPABILITIES}
+            canSignManagement={dashboard?.stats?.can_sign_management ?? null}
+            apiAddress={resolvedApi}
+            socksAddress={resolvedSocks}
+            meta={agentMeta[agent.id] ?? EMPTY_AGENT_META}
+            onMetaChange={handleMetaChange}
+            networks={networks}
+            allForwardKeys={allForwardKeys}
+            agentsById={agentsById}
+            onCapabilityUpdate={handleCapabilityUpdate}
+            onMeshChanged={refresh}
+            onClose={() => handleClosePanel(agent.short_id)}
+            animate={openedAgents.length <= 1 && !animatedAgentIdsRef.current.has(agent.short_id)}
+            onAnimated={handleAgentAnimated}
+          />
+        </ErrorBoundary>
       ))}
 
       {selectedAgentId && openedAgents.length > 0 && (
