@@ -74,8 +74,6 @@ declare -a ENTRIES=(
     "$ENTRY_DIST/mutiauk-linux-amd64|mutiauk-linux-amd64|entry|Linux|amd64|executable|mutiauk"
     "$ENTRY_DIST/mutiauk-linux-arm64|mutiauk-linux-arm64|entry|Linux|arm64|executable|mutiauk"
     "$MUTI_METROO_DIST/muti-metroo-user-manual.pdf|muti-metroo-user-manual.pdf|manual||||user-manual.pdf"
-    "$MUTI_METROO_DIST/muti-metroo-operator-manual.pdf|muti-metroo-operator-manual.pdf|manual||||operator-manual.pdf"
-    "$MUTI_METROO_DIST/muti-metroo-operator-slides.pdf|muti-metroo-operator-slides.pdf|manual||||operator-slides.pdf"
 )
 
 # Build manifest as we go

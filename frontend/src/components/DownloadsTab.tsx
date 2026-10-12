@@ -76,8 +76,6 @@ function downloadLabel(f: DownloadsManifestFile): string {
 // we don't recognise — keeps unknown future docs from breaking.
 const DOC_TITLES: Record<string, string> = {
   'user-manual.pdf': 'User Manual',
-  'operator-manual.pdf': 'Operator Manual',
-  'operator-slides.pdf': 'Operator Slides',
 };
 
 function docTitle(f: DownloadsManifestFile): string {
