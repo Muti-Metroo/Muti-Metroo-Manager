@@ -49,5 +49,6 @@ Run `make hooks` once to enable the Prettier pre-commit hook.
 Releases are automated with [release-please](https://github.com/googleapis/release-please)
 (`.github/workflows/release-please.yml`). Use [Conventional Commits](https://www.conventionalcommits.org/):
 `fix:` → patch, `feat:` → minor, `feat!:`/`BREAKING CHANGE:` → major; `docs:`/`chore:`/`ci:` cut no release.
-release-please bumps `VERSION` and `CHANGELOG.md` on master. `release.sh` (manual,
-GitHub API, needs `GITHUB_TOKEN`) exists for cutting a full binary release with assets.
+Merging the release PR tags the release and updates `CHANGELOG.md` and the
+`.github/.release-please-manifest.json` version pin; the workflow then builds and
+uploads the binaries and checksums. Never tag or create releases by hand.

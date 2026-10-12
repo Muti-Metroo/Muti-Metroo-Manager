@@ -242,66 +242,23 @@ Error codes: `ERR_SHELL_DISABLED = 20`, `ERR_SHELL_AUTH_REQUIRED = 21`, `ERR_SHE
 
 ## Releasing
 
-Day-to-day releases are automated via GitHub Actions using
+Releases are fully automated with
 [release-please](https://github.com/googleapis/release-please)
-(`.github/workflows/release-please.yml`): land Conventional Commits on
-master, release-please opens a release PR that bumps `VERSION` and
-`CHANGELOG.md`, and merging it tags the release.
+(`.github/workflows/release-please.yml`). Land Conventional Commits on
+master (`fix:` patch, `feat:` minor, `feat!:` major; `docs:`/`chore:`/`ci:`
+cut no release); release-please opens a release PR that updates
+`CHANGELOG.md` and the version pin in `.github/.release-please-manifest.json`.
+Merging it creates the `metroo-manager-vX.Y.Z` tag and GitHub release, and
+the workflow builds the frontend, cross-compiles the binaries, and uploads
+them with `checksums.txt`. Never tag or create releases by hand.
 
-`release.sh` exists for a full binary release with cross-compiled
-assets: the script bumps the version, cross-compiles binaries, and
-creates a GitHub release with assets. Do not run it for routine work —
-let release-please cut the tag first, otherwise the two version bumpers
-race.
+Release assets are `metroo-manager-<os>-<arch>` (`.exe` on Windows) for
+darwin/arm64, darwin/amd64, linux/amd64, linux/arm64, windows/amd64, and
+windows/arm64. Linux and Windows amd64 binaries are compressed with UPX.
+Darwin binaries are not (UPX breaks macOS code signing); Windows arm64 is
+also skipped.
 
-### Prerequisites
-
-- `go`, `node`, `npm`, `jq`, `curl` (required)
-- `upx` (optional — compresses Linux (amd64+arm64) and Windows amd64 binaries)
-- `GITHUB_TOKEN` environment variable (GitHub API token with repo write access)
-
-### How to Release (manual, binary assets)
-
-```bash
-# Patch release (default): 0.1.4 → 0.1.5
-GITHUB_TOKEN=xxx ./release.sh
-
-# Minor release: 0.1.4 → 0.2.0
-GITHUB_TOKEN=xxx ./release.sh minor
-
-# Major release: 0.1.4 → 1.0.0
-GITHUB_TOKEN=xxx ./release.sh major
-```
-
-### What the Script Does
-
-1. Reads current version from `VERSION` file, bumps it
-2. Validates clean working tree and available tag
-3. Builds the React frontend (`npm ci && npm run build`)
-4. Cross-compiles Go binaries for 6 platforms (with embedded frontend via `go:embed`)
-5. Optionally compresses binaries with UPX
-6. Generates SHA256 checksums
-7. Commits version bump, creates annotated git tag, pushes both
-8. Creates GitHub release with retry logic
-9. Uploads all binaries + checksums as release assets
-10. Verifies the release
-
-### Build Targets
-
-- darwin/arm64 (macOS Apple Silicon)
-- darwin/amd64 (macOS Intel)
-- linux/amd64 (x86_64)
-- linux/arm64 (ARM64)
-- windows/amd64 (x86_64)
-- windows/arm64 (ARM64)
-
-Linux (amd64+arm64) and Windows amd64 binaries are compressed with UPX. Darwin binaries are not (UPX breaks macOS code signing); Windows arm64 is also skipped.
-
-### Version Management
-
-- Version is stored in `VERSION` file at the project root
-- `VERSION` is bumped by release-please's release PR (or by `release.sh` for a manual binary release) — do not edit it manually
-- Git tags follow the format `v{VERSION}` (e.g., `v0.2.0`)
+Local builds (`make build`) take their version from `git describe`.
 
 **Binaries location**: https://github.com/Muti-Metroo/Muti-Metroo-Manager/releases
 
