@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -48,8 +49,6 @@ type LoadFlags struct {
 	authTokenFile      string
 	insecureNoAuth     bool
 	dataDir            string
-	downloadsBnd       string
-	noDownloads        bool
 	logLevel           string
 	logFormat          string
 	metricsAddr        string
@@ -86,10 +85,10 @@ func NewLoadFlags(name string, errOut io.Writer) *LoadFlags {
 		"allow binding a non-loopback address with no manager auth token (dangerous)")
 	fs.StringVar(&lf.dataDir, "data-dir", d.DataDir,
 		"directory for persistent state (muti-metroo-manager.db)")
-	fs.StringVar(&lf.downloadsBnd, "downloads-bundle", "",
-		"path to muti-metroo-downloads-bundle.zip (default: alongside the binary)")
-	fs.BoolVar(&lf.noDownloads, "no-downloads", false,
-		"disable the downloads tab even if a bundle is present")
+	// The downloads bundle was removed; its flags are still accepted so
+	// existing unit files keep starting, and Resolve warns when they are set.
+	fs.String("downloads-bundle", "", "removed; accepted and ignored")
+	fs.Bool("no-downloads", false, "removed; accepted and ignored")
 	fs.StringVar(&lf.logLevel, "log-level", d.LogLevel,
 		"minimum log severity (debug | info | warn | error)")
 	fs.StringVar(&lf.logFormat, "log-format", d.LogFormat,
@@ -140,8 +139,12 @@ func (lf *LoadFlags) Resolve() (LoadResult, error) {
 		if err != nil {
 			return LoadResult{}, fmt.Errorf("parse %s: %w", configPath, err)
 		}
-		if err := applyFileLayer(&cfg, src, fileMap); err != nil {
+		ignored, err := applyFileLayer(&cfg, src, fileMap)
+		if err != nil {
 			return LoadResult{}, fmt.Errorf("config %s: %w", configPath, err)
+		}
+		for _, k := range ignored {
+			warnings = append(warnings, fmt.Sprintf("config %s: %s is ignored: the downloads bundle was removed", configPath, k))
 		}
 	}
 
@@ -211,13 +214,10 @@ func (lf *LoadFlags) Resolve() (LoadResult, error) {
 		cfg.DataDir = lf.dataDir
 		src["data_dir"] = SourceFlag
 	}
-	if setFlags["downloads-bundle"] {
-		cfg.DownloadsBundle = lf.downloadsBnd
-		src["downloads_bundle"] = SourceFlag
-	}
-	if setFlags["no-downloads"] {
-		cfg.NoDownloads = lf.noDownloads
-		src["no_downloads"] = SourceFlag
+	for _, name := range []string{"downloads-bundle", "no-downloads"} {
+		if setFlags[name] {
+			warnings = append(warnings, "-"+name+" is ignored: the downloads bundle was removed")
+		}
 	}
 	if setFlags["log-level"] {
 		cfg.LogLevel = lf.logLevel
@@ -270,8 +270,10 @@ func (lf *LoadFlags) Resolve() (LoadResult, error) {
 // applyFileLayer copies recognised keys out of a parsed config file
 // onto cfg and records the file as the source. Unknown keys are an
 // error — silently ignoring typos is exactly the kind of foot-gun a
-// hospital ops team should not have to debug at 3am.
-func applyFileLayer(cfg *Config, src Source, m map[string]any) error {
+// hospital ops team should not have to debug at 3am. Keys of removed
+// features are accepted and returned as ignored, because `config init`
+// wrote them into every generated file.
+func applyFileLayer(cfg *Config, src Source, m map[string]any) (ignored []string, err error) {
 	strField := func(key string, dst *string, v any) error {
 		s, ok := v.(string)
 		if !ok {
@@ -309,10 +311,8 @@ func applyFileLayer(cfg *Config, src Source, m map[string]any) error {
 			err = boolField(k, &cfg.InsecureNoAuth, v)
 		case "data_dir":
 			err = strField(k, &cfg.DataDir, v)
-		case "downloads_bundle":
-			err = strField(k, &cfg.DownloadsBundle, v)
-		case "no_downloads":
-			err = boolField(k, &cfg.NoDownloads, v)
+		case "downloads_bundle", "no_downloads":
+			ignored = append(ignored, k)
 		case "log_level":
 			err = strField(k, &cfg.LogLevel, v)
 		case "log_format":
@@ -322,17 +322,18 @@ func applyFileLayer(cfg *Config, src Source, m map[string]any) error {
 		case "no_sounds":
 			err = boolField(k, &cfg.NoSounds, v)
 		case "agent_token":
-			return fmt.Errorf("agent_token in config files is not supported; use agent_token_file or " + EnvAgentToken)
+			return nil, fmt.Errorf("agent_token in config files is not supported; use agent_token_file or " + EnvAgentToken)
 		case "auth_token":
-			return fmt.Errorf("auth_token in config files is not supported; use auth_token_file or " + EnvAuthToken)
+			return nil, fmt.Errorf("auth_token in config files is not supported; use auth_token_file or " + EnvAuthToken)
 		default:
-			return fmt.Errorf("unknown key %q (run `muti-metroo-manager config init` for the full list)", k)
+			return nil, fmt.Errorf("unknown key %q (run `muti-metroo-manager config init` for the full list)", k)
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	sort.Strings(ignored)
+	return ignored, nil
 }
 
 // readTokenFile reads a single-line bearer token. Trailing newlines

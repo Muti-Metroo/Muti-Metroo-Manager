@@ -12,7 +12,6 @@ import (
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agentprobe"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agenttls"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/config"
-	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/downloads"
 )
 
 // runCheck validates config, probes the data dir, and pings
@@ -51,21 +50,7 @@ func runCheck(args []string, build Build, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "data-dir: OK    %s\n", res.Config.DataDir)
 	}
 
-	// 2. Downloads bundle (only fatal when explicitly set).
-	bundlePath, bundleStatus := downloads.ResolvePath(res.Config.DownloadsBundle, res.Config.NoDownloads)
-	switch bundleStatus {
-	case downloads.PathAbsentExplicit:
-		fmt.Fprintf(stdout, "bundle:   FAIL  %s (missing — explicitly set but not found)\n", bundlePath)
-		failed++
-	case downloads.PathPresent:
-		fmt.Fprintf(stdout, "bundle:   OK    %s (present)\n", bundlePath)
-	case downloads.PathDisabled:
-		fmt.Fprintln(stdout, "bundle:   OK    (disabled)")
-	default:
-		fmt.Fprintln(stdout, "bundle:   OK    (none — feature off)")
-	}
-
-	// 3. Agent reachability.
+	// 2. Agent reachability.
 	agentTLS, err := agenttls.Config(res.Config.AgentCABundle, res.Config.InsecureSkipVerify)
 	if err != nil {
 		fmt.Fprintf(stdout, "agent:    FAIL  TLS config: %v\n", err)

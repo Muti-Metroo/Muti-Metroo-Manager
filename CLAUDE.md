@@ -154,21 +154,6 @@ point.
 The SQLite driver is `modernc.org/sqlite` (pure Go) so `CGO_ENABLED=0`
 cross-builds keep working — don't switch to `mattn/go-sqlite3`.
 
-## Optional Downloads Bundle
-
-When a `muti-metroo-downloads-bundle.zip` (built by `bundle-downloads.sh`)
-sits next to the binary — or is pointed at via `-downloads-bundle` —
-the server exposes it under `/api/downloads/manifest` and
-`/api/downloads/file/<name>`, and the frontend reveals the Downloads
-tab. A missing file is the expected default (feature off, tab hidden,
-no log noise). Pass `-downloads-bundle off` to suppress the lookup
-entirely.
-
-The bundle must be flat (no nested entries) and contain a
-`manifest.json` whose `files[].name` matches an entry in the zip — see
-`internal/downloads/downloads.go`. The frontend uses 200 vs 404 on the
-manifest fetch to decide whether to show the tab.
-
 ## Project Structure
 
 ```
@@ -179,19 +164,18 @@ internal/agentprobe/         One-shot upstream-agent reachability probe (used by
 internal/logging/            slog setup (text/json), request-ID propagation, audit-line helper
 internal/metrics/            Prometheus-style counter/histogram/gauge primitives (no external client lib)
 internal/server/server.go    HTTP routing: /api/proxy/* → proxy, /api/settings → store,
-                             /api/agent-meta[/*] → store, /api/downloads/{manifest,file/...} → bundle, /healthz, /* → SPA
+                             /api/agent-meta[/*] → store, /healthz, /* → SPA
 internal/server/metrics.go   Per-request instrumentation middleware + optional /metrics listener
 internal/proxy/proxy.go      Reverse proxy: strips /api/proxy prefix, forwards to agent
 internal/proxy/websocket.go  WebSocket relay (gorilla/websocket), bidirectional binary frames
 internal/store/store.go      SQLite-backed settings + per-agent metadata (modernc.org/sqlite, pure Go)
 internal/store/migrations.go Schema migrations keyed on PRAGMA user_version
-internal/downloads/downloads.go  Read-only zip-bundle file server (manifest.json + flat artifacts)
 internal/webui/embed.go      go:embed all:dist
 internal/webui/webui.go      Static file server with SPA fallback (index.html for extensionless paths)
                              and Cache-Control: immutable for hashed assets/, 1 day for stable
                              filenames (fonts, favicons), no-cache for index.html
 frontend/src/App.tsx          Root component, polling, URL-driven major tab + agent panel
-frontend/src/router.ts        URL state: /<major>/<sub>?agent=&panel= (major: topology|routes|forwards|dns|downloads)
+frontend/src/router.ts        URL state: /<major>/<sub>?agent=&panel= (major: topology|routes|forwards|dns)
 frontend/src/api/client.ts    All API functions (getDashboard, getTopology, shell WS URL, etc.)
 frontend/src/api/types.ts     TypeScript types + shell message constants
 frontend/src/components/MetroMap/    SVG topology: BFS layout, stations, connections, tooltips
@@ -203,7 +187,6 @@ frontend/src/components/EntryConfigWizard/ Mutiauk config wizard
 frontend/src/components/wizard/Field.tsx, WizardShell.tsx   Shared wizard form primitive + the
                              dialog/step-rail frame both wizards render
 frontend/src/components/DnsTab.tsx, DnsHostsTab.tsx, DnsTldsTab.tsx  DNS major tab (Hosts + TLDs sub-tabs)
-frontend/src/components/DownloadsTab.tsx   Downloads major tab (visible only when bundle is mounted)
 frontend/src/components/Header.tsx, Footer.tsx, Tabs.tsx        Chrome (Header owns the theme toggle;
                              Tabs is the single tab strip, size="sm" for sub-tabs)
 frontend/src/components/DialogHeader.tsx    Shared dialog title bar + close button
@@ -336,8 +319,7 @@ Linux (amd64+arm64) and Windows amd64 binaries are compressed with UPX. Darwin b
 
 ### Add a new top-level (major) tab
 1. Add the id to the `MajorTab` union and to `MAJOR_TABS` / `SUB_TABS` / `DEFAULT_SUB_TAB` in `frontend/src/router.ts`
-2. Add an entry to `MAIN_TABS` in `App.tsx` and render the tab body inside the `visibleActiveTab === 'newtab'` branch
-3. If visibility is conditional (like Downloads), filter `visibleTabs` accordingly and add a redirect-away effect for the case when the tab disappears
+2. Add an entry to `MAIN_TABS` in `App.tsx` and render the tab body inside the `majorTab === 'newtab'` branch
 
 ### Modify the shell binary protocol
 1. Update constants in `frontend/src/api/types.ts` (must match agent's `internal/shell/messages.go`)

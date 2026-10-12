@@ -32,7 +32,6 @@ import type {
   AgentMetadataMap,
   NetworkNameMap,
   PositionMap,
-  DownloadsManifest,
 } from './types';
 
 const BASE = '';
@@ -266,22 +265,6 @@ export function getPositions(): Promise<PositionMap> {
 // map clears it — the reset-view action).
 export function putPositions(positions: PositionMap): Promise<{ count: number }> {
   return fetchJSON('/api/positions', 'PUT', positions);
-}
-
-// Returns null when no downloads bundle is mounted (server returns 404).
-// All other failures bubble up so we don't silently hide a working
-// bundle behind a transient network blip.
-export async function getDownloadsManifest(): Promise<DownloadsManifest | null> {
-  try {
-    return await fetchJSON<DownloadsManifest>('/api/downloads/manifest');
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 404) return null;
-    throw err;
-  }
-}
-
-export function downloadsFileURL(name: string): string {
-  return `/api/downloads/file/${encodeURIComponent(name)}`;
 }
 
 export function getMeshTest(forceRefresh = false): Promise<MeshTestResponse> {

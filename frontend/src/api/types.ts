@@ -606,26 +606,6 @@ export interface FileBrowseRootsResponse {
   error?: string;
 }
 
-// Shape of /api/downloads/manifest. The Downloads tab is rendered only
-// when this fetch returns 200 — a 404 (no bundle deployed) hides it.
-export interface DownloadsManifestFile {
-  name: string; // archive name (used in /api/downloads/file/<name>)
-  download_name: string; // friendly filename the browser saves as (e.g. "muti-metroo.exe")
-  category: 'agent' | 'agent-dll' | 'entry' | 'manual';
-  os: string; // human label: "macOS" | "Linux" | "Windows" | ""
-  arch: string; // "amd64" | "arm64" | ""
-  type: string; // "executable" | "dll" | ""
-  size: number;
-  sha256: string;
-  version: string;
-}
-export interface DownloadsManifest {
-  muti_metroo_version: string;
-  entry_version: string;
-  generated_at: string;
-  files: DownloadsManifestFile[];
-}
-
 // Shell binary protocol message types (must match internal/shell/messages.go)
 export const MSG_META = 0x01;
 export const MSG_ACK = 0x02;

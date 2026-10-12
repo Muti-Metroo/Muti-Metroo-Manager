@@ -62,16 +62,6 @@ type Config struct {
 	// DataDir is where muti-metroo-manager.db and the instance lock live.
 	DataDir string `toml:"data_dir"`
 
-	// DownloadsBundle is the path to muti-metroo-downloads-bundle.zip. An
-	// empty string means "look next to the binary"; a path that
-	// doesn't exist is fatal when explicitly set.
-	DownloadsBundle string `toml:"downloads_bundle"`
-
-	// NoDownloads disables the downloads tab even if a bundle is
-	// present next to the binary. Replaces the legacy magic string
-	// `-downloads-bundle off`.
-	NoDownloads bool `toml:"no_downloads"`
-
 	// LogLevel is the minimum slog level (debug | info | warn | error).
 	LogLevel string `toml:"log_level"`
 
@@ -109,8 +99,6 @@ func Defaults() Config {
 		AuthTokenFile:      "",
 		InsecureNoAuth:     false,
 		DataDir:            DefaultDataDir(),
-		DownloadsBundle:    "",
-		NoDownloads:        false,
 		LogLevel:           "info",
 		LogFormat:          "text",
 		MetricsAddr:        "",
@@ -145,8 +133,6 @@ var allFields = []string{
 	"auth_token_file",
 	"insecure_no_auth",
 	"data_dir",
-	"downloads_bundle",
-	"no_downloads",
 	"log_level",
 	"log_format",
 	"metrics_addr",

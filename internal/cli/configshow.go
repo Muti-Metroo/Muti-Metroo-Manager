@@ -92,10 +92,6 @@ func fieldValue(cfg config.Config, key string) any {
 		return cfg.InsecureNoAuth
 	case "data_dir":
 		return cfg.DataDir
-	case "downloads_bundle":
-		return cfg.DownloadsBundle
-	case "no_downloads":
-		return cfg.NoDownloads
 	case "log_level":
 		return cfg.LogLevel
 	case "log_format":

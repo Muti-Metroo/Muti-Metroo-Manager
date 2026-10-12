@@ -140,16 +140,6 @@ done
 echo ""
 echo "Built $(ls dist/ | wc -l | tr -d ' ') binaries"
 
-# --- Downloads bundle ---
-echo ""
-if ./bundle-downloads.sh; then
-    BUNDLE_BUILT=true
-else
-    echo "Warning: bundle-downloads.sh failed; release will not include the downloads bundle."
-    echo "         Build/release ../Muti-Metroo and ../Mutiauk first if you want the bundle."
-    BUNDLE_BUILT=false
-fi
-
 # --- UPX compression ---
 echo ""
 if $HAS_UPX; then
@@ -215,15 +205,6 @@ echo "  Pushed commit and tag to origin"
 echo ""
 echo "=== Creating GitHub release ==="
 
-BUNDLE_SECTION=""
-if $BUNDLE_BUILT; then
-    BUNDLE_SECTION="
-
-### Downloads bundle
-- \`muti-metroo-downloads-bundle.zip\` -- Muti Metroo + Mutiauk binaries and the user manual.
-  Drop next to the muti-metroo-manager binary to enable the in-UI Downloads tab."
-fi
-
 RELEASE_BODY="## Muti Metroo Manager $TAG
 
 ### Binaries
@@ -232,7 +213,7 @@ RELEASE_BODY="## Muti Metroo Manager $TAG
 - \`muti-metroo-manager-linux-amd64\` -- Linux x86_64
 - \`muti-metroo-manager-linux-arm64\` -- Linux ARM64
 - \`muti-metroo-manager-windows-amd64.exe\` -- Windows x86_64
-- \`muti-metroo-manager-windows-arm64.exe\` -- Windows ARM64${BUNDLE_SECTION}
+- \`muti-metroo-manager-windows-arm64.exe\` -- Windows ARM64
 
 ### Verification
 - \`checksums.txt\` -- SHA256 checksums of all artifacts

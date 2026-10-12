@@ -4,16 +4,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agentprobe"
-	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/downloads"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/metrics"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/proxy"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/store"
@@ -26,7 +22,6 @@ type Options struct {
 	AgentURL   string
 	AgentToken string
 	Store      *store.Store
-	Bundle     *downloads.Bundle
 	Version    string
 
 	// TLSConfig configures verification of the agent's certificate for
@@ -66,9 +61,7 @@ type Options struct {
 // exposing healthCache so callers don't reach into server internals.
 type SeedHealthFunc func(agentprobe.Result)
 
-// New builds the HTTP server. Options.Bundle may be nil — when it is,
-// the /api/downloads/* routes are not registered and the frontend
-// hides the Downloads tab.
+// New builds the HTTP server.
 //
 // The returned SeedHealthFunc is non-nil; cmd/manager calls it once
 // the upfront agent probe finishes.
@@ -106,10 +99,6 @@ func New(opts Options) (*http.Server, SeedHealthFunc) {
 	api.Handle("/api/networks", networksListHandler(opts.Store))
 	api.Handle("/api/networks/", networkItemHandler(opts.Store, logger))
 	api.Handle("/api/positions", positionsHandler(opts.Store, logger))
-	if opts.Bundle != nil {
-		api.Handle("/api/downloads/manifest", downloadsManifestHandler(opts.Bundle))
-		api.Handle("/api/downloads/file/", downloadsFileHandler(opts.Bundle))
-	}
 	mux.Handle("/api/", authMiddleware(opts.AuthToken, api))
 	if opts.AuthToken != "" {
 		mux.Handle("/api/auth/login", loginHandler(opts.AuthToken))
@@ -374,73 +363,6 @@ func positionsHandler(st *store.Store, logger *slog.Logger) http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
-}
-
-// downloadsManifestHandler serves GET /api/downloads/manifest with the
-// bundle's pre-rendered JSON. Frontend uses 200 vs 404 to decide whether
-// to show the Downloads tab.
-func downloadsManifestHandler(b *downloads.Bundle) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(b.ManifestJSON())
-	})
-}
-
-// downloadsFileHandler streams a single artifact out of the bundle.
-// Path: /api/downloads/file/<name> — the trailing segment is fed
-// straight to Bundle.File, which rejects path separators and traversal.
-func downloadsFileHandler(b *downloads.Bundle) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		name := strings.TrimPrefix(r.URL.Path, "/api/downloads/file/")
-		rc, size, downloadName, err := b.File(name)
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				http.NotFound(w, r)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer rc.Close()
-		w.Header().Set("Content-Type", contentTypeFor(downloadName))
-		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
-		w.Header().Set("Content-Disposition", `attachment; filename="`+sanitizeFilename(downloadName)+`"`)
-		w.WriteHeader(http.StatusOK)
-		io.Copy(w, rc)
-	})
-}
-
-// sanitizeFilename makes an operator-supplied (manifest) download name
-// safe to embed in a Content-Disposition quoted-string: quotes,
-// backslashes and control characters are flattened to underscores so
-// a crafted name can't break out of the quoting.
-func sanitizeFilename(name string) string {
-	return strings.Map(func(r rune) rune {
-		if r == '"' || r == '\\' || r < 0x20 || r == 0x7f {
-			return '_'
-		}
-		return r
-	}, name)
-}
-
-// contentTypeFor returns a sensible mime type for the artifacts we ship
-// in the bundle. Most Muti Metroo binaries are octet-stream; the manual is PDF.
-func contentTypeFor(name string) string {
-	switch {
-	case strings.HasSuffix(name, ".pdf"):
-		return "application/pdf"
-	default:
-		return "application/octet-stream"
-	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

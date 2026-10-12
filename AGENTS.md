@@ -5,7 +5,7 @@ mesh networks. A minimal Go backend reverse-proxies browser requests to a Muti M
 agent's HTTP API (`/api/proxy/*` is stripped of the prefix and forwarded, HTTP and
 WebSocket) and serves an embedded React SPA with a real-time SVG metro-map topology
 view, monitoring, remote shell, file transfer, route management, DNS hosts/TLDs,
-config wizards, and a downloads bundle.
+and config wizards.
 
 ## Repo layout
 
@@ -16,7 +16,6 @@ config wizards, and a downloads bundle.
 - `internal/webui/` — `go:embed` of the built frontend (`dist/`, generated)
 - `internal/store/` — local state (bbolt), host-key/endpoint handling
 - `internal/agentprobe/` — connectivity/capability probing of the agent
-- `internal/downloads/` — downloads-bundle discovery and manifest
 - `internal/cli/`, `internal/logging/`, `internal/metrics/` — subcommands, logging, Prometheus registry
 - `frontend/` — React 19 + TypeScript + Vite + Tailwind 4 SPA (tests: vitest)
 - `contrib/` — systemd unit and launchd plist examples

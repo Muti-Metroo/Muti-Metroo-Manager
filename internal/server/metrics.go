@@ -107,14 +107,12 @@ func methodLabel(method string) string {
 // becomes its own series.
 func routeLabel(path string) string {
 	switch path {
-	case "/healthz", "/api/settings", "/api/agent-meta", "/api/downloads/manifest":
+	case "/healthz", "/api/settings", "/api/agent-meta":
 		return path
 	}
 	switch {
 	case strings.HasPrefix(path, "/api/agent-meta/"):
 		return "/api/agent-meta/:id"
-	case strings.HasPrefix(path, "/api/downloads/file/"):
-		return "/api/downloads/file/:name"
 	case strings.HasPrefix(path, "/api/proxy/"):
 		return "/api/proxy/*"
 	}

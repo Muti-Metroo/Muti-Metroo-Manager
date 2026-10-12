@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type MajorTab = 'topology' | 'routes' | 'forwards' | 'dns' | 'downloads';
+export type MajorTab = 'topology' | 'routes' | 'forwards' | 'dns';
 export type AgentPanelTab =
   'info' | 'routes' | 'forwards' | 'connectivity' | 'shell' | 'files' | 'ping';
 
-const MAJOR_TABS: readonly MajorTab[] = ['topology', 'routes', 'forwards', 'dns', 'downloads'];
+const MAJOR_TABS: readonly MajorTab[] = ['topology', 'routes', 'forwards', 'dns'];
 const AGENT_PANEL_TABS: readonly AgentPanelTab[] = [
   'info',
   'routes',
@@ -23,7 +23,6 @@ const SUB_TABS: Record<MajorTab, readonly string[]> = {
   routes: ['active', 'test'],
   forwards: [],
   dns: ['hosts', 'tlds'],
-  downloads: [],
 };
 
 const DEFAULT_SUB_TAB: Record<MajorTab, string | null> = {
@@ -31,7 +30,6 @@ const DEFAULT_SUB_TAB: Record<MajorTab, string | null> = {
   routes: 'active',
   forwards: null,
   dns: 'hosts',
-  downloads: null,
 };
 
 const DEFAULT_MAJOR: MajorTab = 'topology';

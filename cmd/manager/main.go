@@ -16,7 +16,6 @@ import (
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agenttls"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/cli"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/config"
-	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/downloads"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/logging"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/metrics"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/server"
@@ -36,7 +35,7 @@ func main() {
 }
 
 // runServer is the long-running command: parse flags, take the
-// instance lock, open the store + downloads bundle, start the HTTP
+// instance lock, open the store, start the HTTP
 // server, and block on SIGINT/SIGTERM.
 func runServer(args []string) int {
 	lf := config.NewLoadFlags("muti-metroo-manager", os.Stderr)
@@ -98,9 +97,6 @@ func runServer(args []string) int {
 	}
 	defer st.Close()
 
-	bundle, bundleSrc, bundleDisabled := openDownloadsBundle(cfg, logger)
-	defer bundle.Close()
-
 	agentTLS, err := agenttls.Config(cfg.AgentCABundle, cfg.InsecureSkipVerify)
 	if err != nil {
 		logger.Error("agent TLS config", slog.String("err", err.Error()))
@@ -127,7 +123,6 @@ func runServer(args []string) int {
 		AuthToken:    cfg.AuthToken,
 		TLSConfig:    agentTLS,
 		Store:        st,
-		Bundle:       bundle,
 		Version:      Version,
 		AgentProber:  prober,
 		Logger:       logger,
@@ -169,13 +164,10 @@ func runServer(args []string) int {
 		probeResult = agentprobe.Result{Error: "probe still running"}
 	}
 	printStartupBanner(logger, bannerInputs{
-		cfg:            cfg,
-		store:          st,
-		lock:           lock,
-		bundle:         bundle,
-		bundlePath:     bundleSrc,
-		bundleDisabled: bundleDisabled,
-		probe:          probeResult,
+		cfg:   cfg,
+		store: st,
+		lock:  lock,
+		probe: probeResult,
 	})
 
 	quit := make(chan os.Signal, 1)
@@ -239,13 +231,10 @@ type startupProbe struct {
 // pieces in one place and keeps printStartupBanner from sprouting
 // positional args every time something new shows up.
 type bannerInputs struct {
-	cfg            config.Config
-	store          *store.Store
-	lock           *store.InstanceLock
-	bundle         *downloads.Bundle
-	bundlePath     string
-	bundleDisabled bool
-	probe          agentprobe.Result
+	cfg   config.Config
+	store *store.Store
+	lock  *store.InstanceLock
+	probe agentprobe.Result
 }
 
 func printStartupBanner(logger *slog.Logger, in bannerInputs) {
@@ -256,7 +245,6 @@ func printStartupBanner(logger *slog.Logger, in bannerInputs) {
 	logger.Info(fmt.Sprintf("  token:     %s", tokenSourceNote(in.cfg)))
 	logger.Info(fmt.Sprintf("  auth:      %s", authNote(in.cfg)))
 	logger.Info(fmt.Sprintf("  data-dir:  %s (db: %s, lock: %s)", in.cfg.DataDir, displayPath(in.store.Path()), displayPath(in.lock.Path())))
-	logger.Info(fmt.Sprintf("  downloads: %s", bundleNote(in.bundle, in.bundlePath, in.bundleDisabled)))
 	if in.store.FirstRun() {
 		logger.Info("first run: created database — back this up alongside your config",
 			slog.String("path", in.store.Path()),
@@ -275,7 +263,7 @@ func bindNote(addr string) string {
 
 // agentNote summarises the upstream probe result. We don't fail
 // startup when the agent is unreachable — the manager is still useful
-// (settings, downloads, audit) even if the proxy targets are down.
+// (settings, audit) even if the proxy targets are down.
 func agentNote(r agentprobe.Result) string {
 	if r.Reachable {
 		bits := []string{"reachable"}
@@ -316,50 +304,11 @@ func authNote(cfg config.Config) string {
 	return "DISABLED (loopback bind only)"
 }
 
-func bundleNote(b *downloads.Bundle, src string, disabled bool) string {
-	switch {
-	case disabled:
-		return "disabled"
-	case b != nil:
-		return fmt.Sprintf("%s (%d files)", src, len(b.Manifest().Files))
-	case src != "":
-		return src + " (not present — feature off)"
-	default:
-		return "(none)"
-	}
-}
-
 func displayPath(p string) string {
 	if p == "" {
 		return "(none)"
 	}
 	return p
-}
-
-// openDownloadsBundle wraps downloads.ResolvePath with the loud-on-
-// missing-explicit-path policy main wants. The legacy `off` sentinel
-// is honoured here so existing operators keep working through one
-// release; -no-downloads is the supported form going forward.
-func openDownloadsBundle(cfg config.Config, logger *slog.Logger) (*downloads.Bundle, string, bool) {
-	if cfg.DownloadsBundle == "off" {
-		logger.Warn("-downloads-bundle off is deprecated; use -no-downloads")
-	}
-	path, status := downloads.ResolvePath(cfg.DownloadsBundle, cfg.NoDownloads)
-	switch status {
-	case downloads.PathDisabled:
-		return nil, "", true
-	case downloads.PathAbsentExplicit:
-		logger.Warn("downloads bundle not found", slog.String("path", path))
-		return nil, path, false
-	case downloads.PathAbsentImplicit:
-		return nil, path, false
-	}
-	b, err := downloads.Open(path)
-	if err != nil {
-		logger.Warn("downloads bundle error", slog.String("path", path), slog.String("err", err.Error()))
-		return nil, path, false
-	}
-	return b, path, false
 }
 
 // printRunUsage is the help text for `muti-metroo-manager` / `muti-metroo-manager run`.

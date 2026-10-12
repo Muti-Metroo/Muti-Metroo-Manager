@@ -28,11 +28,6 @@ FLAGS (run / check / config show)
                             prefer -agent-token-file or %s env.
   -agent-token-file <path>  File containing the bearer token (single line).
   -data-dir <path>          Directory for muti-metroo-manager.db and the instance lock.
-  -downloads-bundle <path>  Path to muti-metroo-downloads-bundle.zip. Empty means
-                            "look next to the binary"; an explicit path that
-                            does not exist is fatal.
-  -no-downloads             Disable the Downloads tab regardless of bundle
-                            presence.
 
 ENVIRONMENT
   %s   bearer token sent to the agent

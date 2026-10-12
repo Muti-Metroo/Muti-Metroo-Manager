@@ -10,7 +10,6 @@ import type {
   AgentMeta,
   AgentMetadataMap,
   NetworkNameMap,
-  DownloadsManifest,
 } from './api/types';
 import { EMPTY_AGENT_META } from './api/types';
 import {
@@ -25,7 +24,6 @@ import {
   getAgentMetadata,
   getNetworks,
   putNetwork,
-  getDownloadsManifest,
   setToken,
   clearToken,
   getToken,
@@ -54,7 +52,6 @@ import { usePanelWidth } from './util/usePanelWidth';
 import { playSound, type SoundKind } from './util/sounds';
 import ConfigWizard from './components/ConfigWizard/ConfigWizard';
 import EntryConfigWizard from './components/EntryConfigWizard/EntryConfigWizard';
-import DownloadsTab from './components/DownloadsTab';
 import DnsTab from './components/DnsTab';
 import { useUrlState, type MajorTab } from './router';
 import { isModalOpen } from './hooks/useModalDismiss';
@@ -88,7 +85,6 @@ const MAIN_TABS: { id: MajorTab; label: string }[] = [
   { id: 'routes', label: 'Routes' },
   { id: 'forwards', label: 'Port Forwarding' },
   { id: 'dns', label: 'DNS' },
-  { id: 'downloads', label: 'Downloads' },
 ];
 
 export default function App() {
@@ -138,8 +134,6 @@ export default function App() {
     sounds_enabled: true,
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Null = no bundle deployed (or not yet checked) → Downloads tab hidden.
-  const [downloadsManifest, setDownloadsManifest] = useState<DownloadsManifest | null>(null);
   const [agentMeta, setAgentMeta] = useState<AgentMetadataMap>({});
   // Network display-name overrides ({id: name}); only renamed networks appear.
   // Membership itself rides on agentMeta.networks.
@@ -263,21 +257,6 @@ export default function App() {
       .catch(() => {
         /* best-effort; the label keeps its previous value */
       });
-  }, []);
-
-  // Downloads bundle manifest. null when no bundle is deployed (server
-  // returns 404 → the Downloads tab stays hidden). Fetched once on mount;
-  // the bundle is mounted at server start and won't change at runtime.
-  // `downloadsFetched` flips once the request settles so we can safely
-  // redirect away from a /downloads URL when no bundle exists.
-  const [downloadsFetched, setDownloadsFetched] = useState(false);
-  useEffect(() => {
-    getDownloadsManifest()
-      .then(setDownloadsManifest)
-      .catch(() => {
-        /* older server without this endpoint */
-      })
-      .finally(() => setDownloadsFetched(true));
   }, []);
 
   const handleMetaChange = useCallback((agentId: string, meta: AgentMeta) => {
@@ -587,12 +566,6 @@ export default function App() {
     return topology.agents.filter(a => openedAgentIds.has(a.short_id));
   }, [topology, openedAgentIds]);
 
-  // Hide the Downloads tab when no bundle is mounted on the server.
-  const visibleTabs = useMemo(
-    () => (downloadsManifest ? MAIN_TABS : MAIN_TABS.filter(t => t.id !== 'downloads')),
-    [downloadsManifest],
-  );
-
   const meshHealth = useMemo(() => summarizeMeshHealth(topology, meshTest), [topology, meshTest]);
 
   const { events: topologyEvents, newConnectionKeys } = useTopologyDiff(topology, meshTest);
@@ -632,24 +605,10 @@ export default function App() {
     document.title = `Muti Metroo · ${peers}${degraded}`;
   }, [meshHealth.peerCount, meshHealth.unreachable]);
 
-  // Redirect away from /downloads via replaceState once we know the
-  // bundle isn't deployed (so the user can't land on a tab that doesn't
-  // render anything, and back-button doesn't trap them in a redirect loop).
-  useEffect(() => {
-    if (downloadsFetched && !downloadsManifest && majorTab === 'downloads') {
-      setMajorTab('topology', { replace: true });
-    }
-  }, [downloadsFetched, downloadsManifest, majorTab, setMajorTab]);
-
   // Every network the mesh already knows about, for the InfoTab typeahead.
   // Derived from membership across all agents plus any network that only
   // exists because it was given a title.
   const networks = useMemo(() => knownNetworks(agentMeta, networkNames), [agentMeta, networkNames]);
-
-  // Render-time fallback for the brief window before the redirect fires
-  // (or when the manifest fetch is still in flight).
-  const visibleActiveTab: MajorTab =
-    majorTab === 'downloads' && !downloadsManifest ? 'topology' : majorTab;
 
   return (
     <div className="app-shell">
@@ -717,8 +676,8 @@ export default function App() {
       <main className={`app-main${selectedAgentId ? ' panel-open' : ''}`}>
         <Tabs
           className="border-hairline border-b"
-          tabs={visibleTabs}
-          activeId={visibleActiveTab}
+          tabs={MAIN_TABS}
+          activeId={majorTab}
           onChange={handleTabChange}
           rightSlot={
             <ActionsMenu
@@ -735,7 +694,7 @@ export default function App() {
             />
           }
         />
-        {visibleActiveTab === 'topology' && (
+        {majorTab === 'topology' && (
           <MetroMap
             agents={topology?.agents ?? []}
             connections={topology?.connections ?? []}
@@ -760,7 +719,7 @@ export default function App() {
             }
           />
         )}
-        {visibleActiveTab === 'routes' && (
+        {majorTab === 'routes' && (
           <RoutesPanel
             routes={dashboard?.routes ?? null}
             subTab={subTab === 'test' ? 'test' : 'active'}
@@ -770,7 +729,7 @@ export default function App() {
             onSelectAgent={id => setAgent(id, { panel: 'routes' })}
           />
         )}
-        {visibleActiveTab === 'forwards' && (
+        {majorTab === 'forwards' && (
           <ForwardRouteTable
             routes={dashboard?.forward_routes ?? null}
             agents={topology?.agents ?? EMPTY_AGENTS}
@@ -778,20 +737,11 @@ export default function App() {
             onClearHighlight={handleClearHighlight}
           />
         )}
-        {visibleActiveTab === 'dns' && (
+        {majorTab === 'dns' && (
           <DnsTab
             subTab={subTab === 'tlds' ? 'tlds' : 'hosts'}
             onSubTabChange={id => setSubTab(id)}
             canSignManagement={dashboard?.stats?.can_sign_management ?? null}
-          />
-        )}
-        {visibleActiveTab === 'downloads' && downloadsManifest && (
-          <DownloadsTab
-            manifest={downloadsManifest}
-            onCreateConfig={cat => {
-              if (cat === 'agent') handleOpenConfigWizard();
-              else if (cat === 'entry') handleOpenEntryWizard();
-            }}
           />
         )}
       </main>

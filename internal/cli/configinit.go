@@ -116,15 +116,6 @@ insecure_no_auth = %t
 # Persistent state directory. Holds muti-metroo-manager.db and the instance lock.
 data_dir = %q
 
-# Path to muti-metroo-downloads-bundle.zip. Empty means "look next to the
-# binary"; if you set this to an explicit path the file must exist or
-# the server refuses to start.
-downloads_bundle = %q
-
-# Hard-disable the Downloads tab even if a bundle is present next to
-# the binary.
-no_downloads = %t
-
 # Minimum log severity. One of: debug | info | warn | error.
 log_level = %q
 
@@ -147,8 +138,6 @@ metrics_addr = %q
 		d.AuthTokenFile,
 		d.InsecureNoAuth,
 		d.DataDir,
-		d.DownloadsBundle,
-		d.NoDownloads,
 		d.LogLevel,
 		d.LogFormat,
 		d.MetricsAddr,

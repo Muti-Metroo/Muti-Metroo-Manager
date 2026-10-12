@@ -16,7 +16,6 @@ vi.mock('../api/client', () => ({
   getAgentMetadata: vi.fn(),
   getNetworks: vi.fn(),
   putNetwork: vi.fn(),
-  getDownloadsManifest: vi.fn(),
   setToken: vi.fn(),
   clearToken: vi.fn(),
   getToken: vi.fn(() => null),
@@ -52,7 +51,6 @@ describe('App dashboard polling', () => {
     vi.mocked(client.getServerHealth).mockResolvedValue({ version: 'test' } as never);
     vi.mocked(client.getAgentMetadata).mockResolvedValue({});
     vi.mocked(client.getNetworks).mockResolvedValue({});
-    vi.mocked(client.getDownloadsManifest).mockRejectedValue(new Error('no bundle'));
   });
   afterEach(() => {
     vi.useRealTimers();
