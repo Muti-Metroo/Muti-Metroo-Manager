@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.44](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.43...metroo-manager-v0.2.44) (2026-10-19)
+
+
+### Bug Fixes
+
+* **deps:** update golang.org/x/crypto and x/net, build with Go 1.26 ([cd00b73](https://github.com/Muti-Metroo/Muti-Metroo-Manager/commit/cd00b73d63e4acb8373e848ebde646cd74cfec39))
+
 ## [0.2.43](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.42...metroo-manager-v0.2.43) (2026-10-19)
 
 
