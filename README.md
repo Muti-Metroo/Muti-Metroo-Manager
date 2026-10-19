@@ -8,17 +8,17 @@ Muti Metroo Manager is the web dashboard of the [Muti Metroo](https://mutimetroo
 
 ## Features
 
-- **Topology Map** — Interactive SVG metro-style network visualization with role indicators, path highlighting, and reachability coloring
-- **Monitoring** — Dashboard stats (peers, streams, routes, exit nodes, SOCKS5, exit handler) with 5s polling
-- **Remote Shell** — xterm.js terminal to any agent via WebSocket binary protocol
-- **File Transfer** — Upload/download files to/from agents (with browseable remote filesystem)
-- **Route Management** — View, add, and remove dynamic routes; view static routes; route trace simulator
-- **Port Forwarding** — Browse forward listeners and endpoints across the mesh
-- **DNS** — Mesh-host registry (name → IPv4/IPv6) and TLD suffix management
-- **Mesh Test** — On-demand or auto-polling (60s) reachability test across all agents
-- **Sleep/Wake** — Cluster-wide sleep and wake control (when enabled)
-- **Agent Panel** — Slide-in detail panel per agent: info, routes, forwards, peers, shell, files, ping tabs
-- **Config Wizards** — Generate Muti Metroo agent and Mutiauk configs from the UI
+- **Topology Map**: Interactive SVG metro-style network visualization with role indicators, path highlighting, and reachability coloring
+- **Monitoring**: Dashboard stats (peers, streams, routes, exit nodes, SOCKS5, exit handler) with 5s polling
+- **Remote Shell**: xterm.js terminal to any agent via WebSocket binary protocol
+- **File Transfer**: Upload/download files to/from agents (with browseable remote filesystem)
+- **Route Management**: View, add, and remove dynamic routes; view static routes; route trace simulator
+- **Port Forwarding**: Browse forward listeners and endpoints across the mesh
+- **DNS**: Mesh-host registry (name → IPv4/IPv6) and TLD suffix management
+- **Mesh Test**: On-demand or auto-polling (60s) reachability test across all agents
+- **Sleep/Wake**: Cluster-wide sleep and wake control (when enabled)
+- **Agent Panel**: Slide-in detail panel per agent with info, routes, forwards, peers, shell, files, ping tabs
+- **Config Wizards**: Generate Muti Metroo agent and Mutiauk configs from the UI
 - **Persistent Settings**, SQLite-backed operator overrides (advertised API/SOCKS5 addresses) and per-agent metadata (note, icon, network membership)
 - **Light / Dark Theme**, Follows the OS by default, toggled from the header and remembered per browser; self-hosted fonts, so the UI needs no internet access
 
@@ -34,13 +34,13 @@ make build
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000) in your browser.
 
 Note: the default `-addr :3000` binds every interface, and the manager refuses
-to start on a non-loopback bind without an auth token — see
+to start on a non-loopback bind without an auth token; see
 [Authentication](#authentication). For a quick local run either pin the
 listener (`-addr 127.0.0.1:3000`) or set a token.
 
 ## Authentication
 
-The manager can require its own access token for **all** `/api/*` routes —
+The manager can require its own access token for **all** `/api/*` routes,
 including `/api/proxy/*`, which carries remote shell and file transfer into
 the mesh. Set it with `-auth-token-file` (recommended) or the
 `METROO_MANAGER_AUTH_TOKEN` env var:
@@ -59,13 +59,13 @@ upgrades are covered by the same cookie; non-browser WS clients may pass
 Without a token the manager keeps working as before but logs a loud startup
 warning, and **refuses to bind a non-loopback address** unless you pass
 `-insecure-no-auth`. Running without a token means anyone who can reach the
-port has full control of the agent API — only do this on a loopback bind or
+port has full control of the agent API. Only do this on a loopback bind or
 behind an authenticating reverse proxy.
 
 The SPA is served same-origin, so the manager emits no CORS headers, and the
 WebSocket upgrader only accepts same-origin (or Origin-less, i.e. non-browser)
 upgrade requests. When deploying behind a reverse proxy, terminate TLS there
-and pin the manager to `127.0.0.1:3000` (or set `-auth-token-file`) — the
+and pin the manager to `127.0.0.1:3000` (or set `-auth-token-file`). The
 login cookie is marked `Secure` automatically when the request arrives over
 HTTPS (`X-Forwarded-Proto: https`).
 
@@ -87,9 +87,9 @@ use today.
 
 ## Configuration
 
-Muti Metroo Manager reads its configuration from three layers — built-in
+Muti Metroo Manager reads its configuration from four layers (built-in
 defaults, an optional TOML file, the process environment, and CLI
-flags — with each later layer overriding the previous. Use
+flags), with each later layer overriding the previous. Use
 `muti-metroo-manager config show` to render the resolved configuration with
 per-field provenance.
 
@@ -107,20 +107,20 @@ per-field provenance.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-config` | — | Path to a TOML config file (overridden by env and flags) |
+| `-config` | (none) | Path to a TOML config file (overridden by env and flags) |
 | `-addr` | `:3000` | HTTP listen address (binds every interface; pin to `127.0.0.1:3000` if behind a reverse proxy) |
 | `-agent` | `http://127.0.0.1:8080` | Muti Metroo agent URL to proxy to |
-| `-agent-token` | — | Bearer token for agent API authentication. Visible via `/proc/<pid>/cmdline`; prefer `-agent-token-file` or `METROO_MANAGER_AGENT_TOKEN` |
-| `-agent-token-file` | — | File containing the bearer token (single line, trimmed). Recommended for production. |
-| `-agent-ca-bundle` | — | PEM file with extra CA certificates for verifying the agent's TLS certificate (for `https://` agent URLs with self-signed/private-CA certs) |
-| `-insecure-skip-verify` | `false` | Disable TLS verification of the agent (the agent token becomes MITM-able; logs a startup warning — prefer `-agent-ca-bundle`) |
-| `-auth-token` | — | Manager's own access token guarding all `/api/*` routes. Visible via `/proc/<pid>/cmdline`; prefer `-auth-token-file` or `METROO_MANAGER_AUTH_TOKEN` |
-| `-auth-token-file` | — | File containing the manager auth token (single line, trimmed). Recommended for production. |
+| `-agent-token` | (none) | Bearer token for agent API authentication. Visible via `/proc/<pid>/cmdline`; prefer `-agent-token-file` or `METROO_MANAGER_AGENT_TOKEN` |
+| `-agent-token-file` | (none) | File containing the bearer token (single line, trimmed). Recommended for production. |
+| `-agent-ca-bundle` | (none) | PEM file with extra CA certificates for verifying the agent's TLS certificate (for `https://` agent URLs with self-signed/private-CA certs) |
+| `-insecure-skip-verify` | `false` | Disable TLS verification of the agent (the agent token becomes MITM-able; logs a startup warning; prefer `-agent-ca-bundle`) |
+| `-auth-token` | (none) | Manager's own access token guarding all `/api/*` routes. Visible via `/proc/<pid>/cmdline`; prefer `-auth-token-file` or `METROO_MANAGER_AUTH_TOKEN` |
+| `-auth-token-file` | (none) | File containing the manager auth token (single line, trimmed). Recommended for production. |
 | `-insecure-no-auth` | `false` | Allow binding a non-loopback address with no manager auth token (dangerous) |
 | `-data-dir` | OS-appropriate¹ | Directory for `muti-metroo-manager.db` and the instance lock |
 | `-log-level` | `info` | Minimum log severity: `debug`, `info`, `warn`, `error` |
 | `-log-format` | `text` | Log encoding: `text` (human) or `json` (SIEM ingestion) |
-| `-metrics-addr` | — | host:port to expose Prometheus `/metrics` on (empty disables); pin to a private interface |
+| `-metrics-addr` | (none) | host:port to expose Prometheus `/metrics` on (empty disables); pin to a private interface |
 
 ¹ macOS: `~/Library/Application Support/Muti-Metroo-Manager/`. Linux as root:
 `/var/lib/muti-metroo-manager`. Linux as a user: `$XDG_CONFIG_HOME/muti-metroo-manager`.
@@ -166,7 +166,7 @@ Inline `agent_token`/`auth_token` are intentionally rejected; use the
 ### Observability
 
 - `GET /healthz` (on the main listener) returns the manager's own
-  status plus the cached upstream-agent reachability — safe to scrape
+  status plus the cached upstream-agent reachability, safe to scrape
   from external monitoring.
 - `GET /metrics` (on the optional `-metrics-addr` listener) returns
   Prometheus text format. Series include `metroo_manager_requests_total`,
@@ -181,12 +181,12 @@ Inline `agent_token`/`auth_token` are intentionally rejected; use the
 
 Reference unit files live in `contrib/`:
 
-- `contrib/systemd/muti-metroo-manager.service` — Linux systemd. Pre-start runs
+- `contrib/systemd/muti-metroo-manager.service`: Linux systemd. Pre-start runs
   `muti-metroo-manager check`; sandbox knobs (`ProtectSystem=strict`,
   `NoNewPrivileges=true`, etc.) are turned on by default.
-- `contrib/launchd/com.muti-metroo-manager.plist` — macOS user agent. Pin
+- `contrib/launchd/com.muti-metroo-manager.plist`: macOS user agent. Pin
   paths and (optional) the bearer token in `EnvironmentVariables`.
-- `contrib/openrc/muti-metroo-manager` — OpenRC for Alpine / Gentoo.
+- `contrib/openrc/muti-metroo-manager`: OpenRC for Alpine / Gentoo.
 
 On SIGINT/SIGTERM the manager drains in-flight HTTP requests with a 15s
 grace period (`srv.Shutdown`). Note that hijacked WebSocket connections
@@ -199,10 +199,10 @@ process exits.
 Run the Go backend and Vite dev server in separate terminals:
 
 ```bash
-# Terminal 1 — Go backend
+# Terminal 1: Go backend
 go run ./cmd/manager -addr :3000 -agent http://<agent-host>:8080
 
-# Terminal 2 — Vite dev server (hot reload)
+# Terminal 2: Vite dev server (hot reload)
 cd frontend && npm install && npm run dev
 ```
 
@@ -245,6 +245,6 @@ Makefile                build, build-frontend, build-go, dev, clean targets
 
 ## Architecture
 
-**Go backend** — Minimal reverse proxy that sits between the browser and a Muti Metroo agent. All `/api/proxy/*` requests are stripped of the prefix and forwarded to the agent (HTTP and WebSocket). A small SQLite database (managed by `internal/store`) holds operator-set overrides for the advertised API/SOCKS5 addresses plus per-agent operator metadata (note + icon). The Vite-built frontend is embedded into the binary via `go:embed` and served with SPA fallback. External Go dependencies: `gorilla/websocket` (proxy) and `modernc.org/sqlite` (pure-Go SQLite driver).
+**Go backend**: Minimal reverse proxy that sits between the browser and a Muti Metroo agent. All `/api/proxy/*` requests are stripped of the prefix and forwarded to the agent (HTTP and WebSocket). A small SQLite database (managed by `internal/store`) holds operator-set overrides for the advertised API/SOCKS5 addresses plus per-agent operator metadata (note + icon). The Vite-built frontend is embedded into the binary via `go:embed` and served with SPA fallback. External Go dependencies: `gorilla/websocket` (proxy) and `modernc.org/sqlite` (pure-Go SQLite driver).
 
 **React frontend**, Single-page app built with React 19, TypeScript, and Vite, styled with Tailwind v4 + FlyonUI (compiled by the Vite plugin from `frontend/src/styles/app.css`; FlyonUI's runtime JS is not loaded, since React owns every interactive component). The router (`frontend/src/router.ts`) is a hand-rolled URL state hook, no routing library, encoding the major tab, sub-tab, selected agent, and agent-panel tab into the path + query (`/<major>/<sub>?agent=&panel=`). State is managed with React hooks (`useState`, `useRef`, `useEffect` polling). The shell tab uses xterm.js with a custom binary WebSocket protocol for PTY communication.

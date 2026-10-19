@@ -1,4 +1,4 @@
-# Muti Metroo Manager — Claude Code Instructions
+# Muti Metroo Manager: Claude Code Instructions
 
 **Documentation:** https://github.com/Muti-Metroo/Muti-Metroo-Manager/
 
@@ -8,13 +8,13 @@ Muti Metroo Manager is part of the Muti Metroo suite (agent, Mutiauk, Manager), 
 
 **Source:** `../Muti-Metroo` (`github.com/Muti-Metroo/Muti-Metroo`)
 
-Userspace mesh networking agent. Creates encrypted TCP tunnels over QUIC/HTTP2/WebSocket transports. Multi-hop routing with SOCKS5 ingress and CIDR-based exit routing. E2E encryption (X25519 + ChaCha20-Poly1305) — transit nodes can't decrypt payload.
+Userspace mesh networking agent. Creates encrypted TCP tunnels over QUIC/HTTP2/WebSocket transports. Multi-hop routing with SOCKS5 ingress and CIDR-based exit routing. E2E encryption (X25519 + ChaCha20-Poly1305), so transit nodes can't decrypt payload.
 
 ### Agent Roles
 
-- **Ingress** — SOCKS5 proxy entry point, looks up routes, opens streams to exit
-- **Transit** — Relays frames between peers, can't decrypt payload
-- **Exit** — Opens real TCP connections, advertises CIDR routes, handles DNS
+- **Ingress**: SOCKS5 proxy entry point, looks up routes, opens streams to exit
+- **Transit**: Relays frames between peers, can't decrypt payload
+- **Exit**: Opens real TCP connections, advertises CIDR routes, handles DNS
 
 ### Key Concepts
 
@@ -34,7 +34,7 @@ Muti Metroo Manager proxies all of these via `/api/proxy/*`:
 | Remote | `/agents/{id}`, `/agents/{id}/shell` (WS), `/agents/{id}/file/upload`, `/agents/{id}/file/download`, `/agents/{id}/routes/manage` |
 | Control | `/routes/advertise`, `/sleep`, `/wake`, `/sleep/status` |
 
-`/routes/manage` supports `action: add | remove | list | set_comment | set_source_ip | set_interface`. `source_ip` binds outbound TCP for a route to a specific local IP (`net.Dialer.LocalAddr`); empty clears. `set_interface` selects the egress NIC for a route; empty clears. It is accepted on any platform — on Linux + root it pins the NIC via `SO_BINDTODEVICE`, elsewhere the agent binds a source address picked from that interface. The only rejected case is an explicit `source_ip` not assigned to the chosen interface unless the agent is Linux + root. Both are local-only and never advertised to peers.
+`/routes/manage` supports `action: add | remove | list | set_comment | set_source_ip | set_interface`. `source_ip` binds outbound TCP for a route to a specific local IP (`net.Dialer.LocalAddr`); empty clears. `set_interface` selects the egress NIC for a route; empty clears. It is accepted on any platform: on Linux + root it pins the NIC via `SO_BINDTODEVICE`, elsewhere the agent binds a source address picked from that interface. The only rejected case is an explicit `source_ip` not assigned to the chosen interface unless the agent is Linux + root. Both are local-only and never advertised to peers.
 
 ### Agent Config (relevant to Muti Metroo Manager)
 
@@ -58,7 +58,7 @@ make build-frontend
 # Go binary only (outputs to build/muti-metroo-manager)
 make build-go
 
-# Dev mode — two terminals:
+# Dev mode (two terminals):
 go run ./cmd/manager -addr :3000 -agent http://<agent>:8080
 cd frontend && npm run dev   # Vite on :5173, proxies /api/proxy/* to :3000
 
@@ -66,7 +66,7 @@ cd frontend && npm run dev   # Vite on :5173, proxies /api/proxy/* to :3000
 make clean
 ```
 
-IMPORTANT: After frontend changes, you must rebuild **both** the frontend and the Go binary. The Go binary embeds `internal/webui/dist/` via `go:embed` — stale dist means stale UI.
+IMPORTANT: After frontend changes, you must rebuild **both** the frontend and the Go binary. The Go binary embeds `internal/webui/dist/` via `go:embed`, so stale dist means stale UI.
 
 ## Formatting
 
@@ -141,20 +141,20 @@ otherwise on Linux, `%LOCALAPPDATA%\muti-metroo-manager` on Windows.
 
 Tables (see `internal/store/migrations.go`, schema versioned via `PRAGMA user_version`):
 
-- `settings` — key/value table; today holds `api_address` and
+- `settings`: key/value table; today holds `api_address` and
   `socks_address` overrides for the labels the UI shows. An empty value
   is deleted (frontend then falls back to `window.location.host`).
-- `agent_notes` — per-agent operator metadata: free-form `note` plus an
+- `agent_notes`: per-agent operator metadata, a free-form `note` plus an
   `icon` key (the icon catalog itself lives in the frontend; the backend
   just stores the chosen key, lower-case `[a-z0-9_-]{0,32}`). Rows where
   both fields are empty are deleted, not stored.
 
 Future domains (saved searches, etc.) drop in as new tables behind their
-own typed methods — the generic key/value table is not the extension
+own typed methods; the generic key/value table is not the extension
 point.
 
 The SQLite driver is `modernc.org/sqlite` (pure Go) so `CGO_ENABLED=0`
-cross-builds keep working — don't switch to `mattn/go-sqlite3`.
+cross-builds keep working, so don't switch to `mattn/go-sqlite3`.
 
 ## Project Structure
 
@@ -216,7 +216,7 @@ All frontend API calls go to `/api/proxy/*`. The Go server strips the `/api/prox
 - Sleep status: 10000ms (`SLEEP_POLL_INTERVAL`)
 
 ### State Management
-Pure React hooks — no external state library. Agent capabilities are cached in a `useRef<Map>` to persist across re-renders without triggering them. Topology layout is memoized via content hash (`hashTopology()`).
+Pure React hooks, no external state library. Agent capabilities are cached in a `useRef<Map>` to persist across re-renders without triggering them. Topology layout is memoized via content hash (`hashTopology()`).
 
 ### WebSocket Shell Protocol
 Binary frames with 1-byte message type prefix (constants in `frontend/src/api/types.ts`, mirroring the agent's `internal/shell/messages.go`):
@@ -238,9 +238,9 @@ Error codes: `ERR_SHELL_DISABLED = 20`, `ERR_SHELL_AUTH_REQUIRED = 21`, `ERR_SHE
 
 ## Shell Tab Gotchas
 
-1. **xterm.css is required** — Without `import '@xterm/xterm/css/xterm.css'`, the DOM renderer shows garbage (`xterm-char-measure-element` visible). Always import it.
-2. **Do NOT use CanvasAddon** — `@xterm/addon-canvas` v0.7.0 breaks cursor rendering with xterm v6.0.0. The DOM renderer works correctly.
-3. **Echo loop prevention** — BusyBox PTYs echo terminal query responses back. Suppressed via CSI parser handlers for DSR (`n`), DA1 (`c`), DA2 (`>c`), and CPR (`R`). DSR responses are proxied back via `sendStdin()` for vi/ash cursor positioning. Belt-and-suspenders regex on `onData`: `/^\x1b\[[\?>]?[\d;]*[Rcn]$/`.
+1. **xterm.css is required**: Without `import '@xterm/xterm/css/xterm.css'`, the DOM renderer shows garbage (`xterm-char-measure-element` visible). Always import it.
+2. **Do NOT use CanvasAddon**: `@xterm/addon-canvas` v0.7.0 breaks cursor rendering with xterm v6.0.0. The DOM renderer works correctly.
+3. **Echo loop prevention**: BusyBox PTYs echo terminal query responses back. Suppressed via CSI parser handlers for DSR (`n`), DA1 (`c`), DA2 (`>c`), and CPR (`R`). DSR responses are proxied back via `sendStdin()` for vi/ash cursor positioning. Belt-and-suspenders regex on `onData`: `/^\x1b\[[\?>]?[\d;]*[Rcn]$/`.
 
 ## Releasing
 
@@ -269,7 +269,7 @@ Local builds (`make build`) take their version from `git describe`.
 ### Add a new API endpoint
 1. Add the function in `frontend/src/api/client.ts`
 2. Add any new types in `frontend/src/api/types.ts`
-3. Call from the appropriate component — the Go proxy forwards everything under `/api/proxy/*` automatically
+3. Call from the appropriate component; the Go proxy forwards everything under `/api/proxy/*` automatically
 
 ### Add a new AgentPanel tab
 1. Create `frontend/src/components/AgentPanel/NewTab.tsx`
@@ -287,4 +287,4 @@ Local builds (`make build`) take their version from `git describe`.
 ### Add a persisted setting or per-agent metadata field
 1. Extend `Settings` (or `AgentMeta`) in `internal/store/store.go` and the matching TypeScript type in `frontend/src/api/types.ts`
 2. Append a migration to `internal/store/migrations.go` (the slice index + 1 is the target `user_version`)
-3. Wire reads/writes through the existing `/api/settings` or `/api/agent-meta/{id}` handlers — the store enforces validation
+3. Wire reads/writes through the existing `/api/settings` or `/api/agent-meta/{id}` handlers; the store enforces validation

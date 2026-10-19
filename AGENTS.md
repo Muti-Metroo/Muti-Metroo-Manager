@@ -1,4 +1,4 @@
-# AGENTS.md — Muti Metroo Manager
+# AGENTS.md: Muti Metroo Manager
 
 Web-based management UI ("Muti Metroo Manager") for [Muti Metroo](https://github.com/Muti-Metroo/Muti-Metroo)
 mesh networks. A minimal Go backend reverse-proxies browser requests to a Muti Metroo
@@ -9,17 +9,17 @@ and config wizards.
 
 ## Repo layout
 
-- `cmd/manager/` — binary entrypoint (`main.go`); the binary is `muti-metroo-manager`
-- `internal/config/` — flags, env vars, YAML config loading
-- `internal/server/` — HTTP server, routing, auth, health, metrics
-- `internal/proxy/` — reverse proxy to the agent (HTTP + WebSocket relay)
-- `internal/webui/` — `go:embed` of the built frontend (`dist/`, generated)
-- `internal/store/` — local state (bbolt), host-key/endpoint handling
-- `internal/agentprobe/` — connectivity/capability probing of the agent
-- `internal/cli/`, `internal/logging/`, `internal/metrics/` — subcommands, logging, Prometheus registry
-- `frontend/` — React 19 + TypeScript + Vite + Tailwind 4 SPA (tests: vitest)
-- `contrib/` — systemd unit and launchd plist examples
-- `docs/` — additional docs; `docs/prompts/` holds agent-task prompts
+- `cmd/manager/`: binary entrypoint (`main.go`); the binary is `muti-metroo-manager`
+- `internal/config/`: flags, env vars, YAML config loading
+- `internal/server/`: HTTP server, routing, auth, health, metrics
+- `internal/proxy/`: reverse proxy to the agent (HTTP + WebSocket relay)
+- `internal/webui/`: `go:embed` of the built frontend (`dist/`, generated)
+- `internal/store/`: local state (bbolt), host-key/endpoint handling
+- `internal/agentprobe/`: connectivity/capability probing of the agent
+- `internal/cli/`, `internal/logging/`, `internal/metrics/`: subcommands, logging, Prometheus registry
+- `frontend/`: React 19 + TypeScript + Vite + Tailwind 4 SPA (tests: vitest)
+- `contrib/`: systemd unit and launchd plist examples
+- `docs/`: additional docs; `docs/prompts/` holds agent-task prompts
 
 ## Build & test
 
@@ -39,7 +39,7 @@ Run `make hooks` once to enable the Prettier pre-commit hook.
 
 - Go: standard `gofmt`-clean code; keep `go vet ./...` clean.
 - Frontend: TypeScript, Prettier (`npm run format:check`), vitest for unit tests.
-- English only — code, comments, docs, and UI strings.
+- English only: code, comments, docs, and UI strings.
 - Branding: the product is **Muti Metroo Manager**; the upstream agent is **Muti Metroo**;
   the companion entry client is **Mutiauk**. The mascot is a mole (see `frontend/public/logo.png`).
   Do not reintroduce legacy "Meshy" naming or hedgehog imagery.

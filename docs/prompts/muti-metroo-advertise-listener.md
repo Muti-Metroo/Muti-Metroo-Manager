@@ -1,14 +1,14 @@
 # Muti Metroo: advertise each agent's dial-target listener over NodeInfo
 
-You are working on the **Muti Metroo agent** (Go) at `github.com/Muti-Metroo/Muti-Metroo` (sibling repo to Muti-Metroo-Manager; in this dev tree it's at `../Muti-Metroo` from Muti-Metroo-Manager). Do **not** edit Muti-Metroo-Manager — that repo is consuming this change in a parallel session.
+You are working on the **Muti Metroo agent** (Go) at `github.com/Muti-Metroo/Muti-Metroo` (sibling repo to Muti-Metroo-Manager; in this dev tree it's at `../Muti-Metroo` from Muti-Metroo-Manager). Do **not** edit Muti-Metroo-Manager; that repo is consuming this change in a parallel session.
 
 ## Why this is needed
 
-Muti-Metroo-Manager's "Generate Muti Metroo Agent Config" wizard pre-populates the new agent's `peers:` list from a "pick a peer to dial" picker. Today the picker pulls only the **local** agent's outbound peer table, so it can offer just the addresses that the *local* operator's agent currently dials — typically one or two. An operator preparing a config for an agent that should dial **LAMP** (a mesh member the local agent has no direct link to) gets nothing useful, even though LAMP is reachable transitively through the mesh.
+Muti-Metroo-Manager's "Generate Muti Metroo Agent Config" wizard pre-populates the new agent's `peers:` list from a "pick a peer to dial" picker. Today the picker pulls only the **local** agent's outbound peer table, so it can offer just the addresses that the *local* operator's agent currently dials, typically one or two. An operator preparing a config for an agent that should dial **LAMP** (a mesh member the local agent has no direct link to) gets nothing useful, even though LAMP is reachable transitively through the mesh.
 
-The fix is to surface **each mesh member's own dial-target listener** as part of the `/api/topology` response. The local Muti-Metroo-Manager instance already proxies `/api/topology` straight from this agent and renders every member it sees — but the per-agent NodeInfo currently carries no listener address, only `socks5_addr`, `forward_endpoints`, `exit_routes`, etc.
+The fix is to surface **each mesh member's own dial-target listener** as part of the `/api/topology` response. The local Muti-Metroo-Manager instance already proxies `/api/topology` straight from this agent and renders every member it sees, but the per-agent NodeInfo currently carries no listener address, only `socks5_addr`, `forward_endpoints`, `exit_routes`, etc.
 
-Once each agent advertises its listener over NodeInfo, the wizard can list every mesh member with an advertised listener — including agents the local one has never dialed. Operators can then prepare a config for a brand-new agent that will dial LAMP directly, without first chaining through the local agent.
+Once each agent advertises its listener over NodeInfo, the wizard can list every mesh member with an advertised listener, including agents the local one has never dialed. Operators can then prepare a config for a brand-new agent that will dial LAMP directly, without first chaining through the local agent.
 
 ## What to build
 
@@ -30,8 +30,8 @@ listeners:
 
 Behavior:
 
-- `advertise` is **opt-in**. Without it, the listener is **not** propagated over NodeInfo — operators behind NAT or on internal-only listeners must not be auto-advertised.
-- `advertise.address` is required when the block is present, must validate as `host:port` (reject `0.0.0.0:N`, `127.0.0.1:N`, `::N` — those are obviously wrong as dial targets and are common mistakes).
+- `advertise` is **opt-in**. Without it, the listener is **not** propagated over NodeInfo, because operators behind NAT or on internal-only listeners must not be auto-advertised.
+- `advertise.address` is required when the block is present, must validate as `host:port` (reject `0.0.0.0:N`, `127.0.0.1:N`, `::N`; those are obviously wrong as dial targets and are common mistakes).
 - `advertise.path` and `advertise.transport` default to the listener's own values; allow overriding only for unusual reverse-proxy setups.
 - An agent may declare advertise on **multiple** listeners (e.g. one quic + one h2). Carry all of them.
 
@@ -50,12 +50,12 @@ type AdvertisedListener struct {
 AdvertisedListeners []AdvertisedListener `json:"advertised_listeners,omitempty"`
 ```
 
-Use the plural `advertised_listeners` from day one — even if most agents have one, the data model should support multi-transport advertisement without a future schema break.
+Use the plural `advertised_listeners` from day one, even if most agents have one, the data model should support multi-transport advertisement without a future schema break.
 
 Encoding rules:
 - Empty/nil → omit the field entirely (don't emit `"advertised_listeners": []`).
 - Order is config order (don't sort).
-- Drop entries during NodeInfo serialization if `advertise.address` is empty — defensive.
+- Drop entries during NodeInfo serialization if `advertise.address` is empty (defensive).
 
 ### 3. Topology endpoint
 
@@ -68,7 +68,7 @@ type TopologyAgentInfo struct {
 }
 ```
 
-Pass through verbatim from each NodeInfo. The local agent should also include its own `advertised_listeners` (so the topology list is symmetric — every member, including the local one, surfaces its dial targets the same way).
+Pass through verbatim from each NodeInfo. The local agent should also include its own `advertised_listeners` (so the topology list is symmetric: every member, including the local one, surfaces its dial targets the same way).
 
 ### 4. Tests
 
@@ -90,7 +90,7 @@ If `github.com/Muti-Metroo/Muti-Metroo-Manager/` (or the agent's own docs site) 
 
 ## How the consumer uses this
 
-For context only — do not implement: Muti-Metroo-Manager's `ConfigWizard.tsx` will read `agent.advertised_listeners` from `/api/topology`, synthesize "available peer" candidates for every mesh member that has one (excluding `is_local`), and merge with the local agent's outbound peer table (current source). Topology-derived entries win on conflict; both sources are deduped by `agent.id`.
+For context only, do not implement: Muti-Metroo-Manager's `ConfigWizard.tsx` will read `agent.advertised_listeners` from `/api/topology`, synthesize "available peer" candidates for every mesh member that has one (excluding `is_local`), and merge with the local agent's outbound peer table (current source). Topology-derived entries win on conflict; both sources are deduped by `agent.id`.
 
 ## Verify
 
