@@ -2,6 +2,8 @@
 
 **Documentation:** https://github.com/Muti-Metroo/Muti-Metroo-Manager/
 
+Muti Metroo Manager is part of the Muti Metroo suite (agent, Mutiauk, Manager), presented as one suite rather than separate products. Agents run on the mesh nodes; the operator typically runs Manager and Mutiauk on the workstation. Mutiauk is the operator's primary entry point (TUN traffic into an ingress agent's SOCKS5 listener); direct SOCKS clients are the secondary path.
+
 ## Muti Metroo (the agent)
 
 **Source:** `../Muti-Metroo` (`github.com/Muti-Metroo/Muti-Metroo`)

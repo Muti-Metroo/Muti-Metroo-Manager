@@ -2,7 +2,9 @@
 
 Web-based management UI for Muti Metroo mesh networks. Provides a real-time SVG metro-map topology view, monitoring, remote shell access, file transfer, route management, mesh testing, and sleep/wake cluster control.
 
-**Documentation:** https://github.com/Muti-Metroo/Muti-Metroo-Manager/
+Muti Metroo Manager is the web dashboard of the [Muti Metroo](https://mutimetroo.com/) suite. `muti-metroo` agents run on the mesh nodes (relays, gateways, transit hops, exits). The operator typically runs Muti Metroo Manager on the workstation alongside [Mutiauk](https://mutimetroo.com/mutiauk), which carries traffic into the SOCKS5 listener of an ingress agent. Manager connects to an agent's HTTP API for the topology view and management actions, and its config wizards generate both agent and Mutiauk configs.
+
+**Documentation:** https://mutimetroo.com/muti-metroo-manager
 
 ## Features
 
@@ -26,10 +28,10 @@ Web-based management UI for Muti Metroo mesh networks. Provides a real-time SVG 
 
 ```bash
 make build
-./build/muti-metroo-manager -agent http://<agent-host>:8080
+./build/muti-metroo-manager -addr 127.0.0.1:3000 -agent http://<agent-host>:8080
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000) in your browser.
 
 Note: the default `-addr :3000` binds every interface, and the manager refuses
 to start on a non-loopback bind without an auth token — see
