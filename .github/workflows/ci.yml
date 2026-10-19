@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -63,9 +63,11 @@ jobs:
           name: webui-dist
           path: internal/webui/dist
 
+      # Latest 1.26 patch release, the same as the release workflow, so tests
+      # run against a current standard library.
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: "1.26"
 
       - name: gofmt
         run: |
