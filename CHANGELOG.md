@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.43](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.42...metroo-manager-v0.2.43) (2026-10-19)
+
+
+### Features
+
+* serve agent folders as WebDAV file shares ([ae61df2](https://github.com/Muti-Metroo/Muti-Metroo-Manager/commit/ae61df2831a3960f867894cc8a5fd4784f4e2835))
+
+
+### Bug Fixes
+
+* **cli:** list every flag in the -h help page ([2059946](https://github.com/Muti-Metroo/Muti-Metroo-Manager/commit/20599463b6333234ab2550fd974e3c6c0809d628))
+
 ## [0.2.42](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.41...metroo-manager-v0.2.42) (2026-10-11)
 
 
