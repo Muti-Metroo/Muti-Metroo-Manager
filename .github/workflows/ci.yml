@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Prettier
+        working-directory: frontend
+        run: npm run format:check
+
+      - name: Tests
+        working-directory: frontend
+        run: npm test
+
+      # Type-checks and writes internal/webui/dist, which the Go binary embeds.
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webui-dist
+          path: internal/webui/dist
+          retention-days: 1
+
+  go:
+    name: Go tests
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: webui-dist
+          path: internal/webui/dist
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l cmd internal)
+          if [ -n "$unformatted" ]; then echo "not gofmt-formatted:"; echo "$unformatted"; exit 1; fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race -count=1 -timeout 15m ./...
+
+  # WebDAV file shares against real binaries: a target agent, a gateway
+  # agent, and the manager, checked with curl, the litmus compliance suite,
+  # and a davfs2 mount (scripts/e2e-fileshare-docker.sh). The agent is
+  # built from Muti Metroo master.
+  e2e-fileshare:
+    name: File share end-to-end
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: manager
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Muti-Metroo/Muti-Metroo
+          path: Muti-Metroo
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: webui-dist
+          path: manager/internal/webui/dist
+
+      # The agent needs Go 1.26; the manager builds with it too.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: |
+            manager/go.sum
+            Muti-Metroo/go.sum
+
+      - name: Run end-to-end test
+        run: manager/scripts/e2e-fileshare-docker.sh --mm-src "$GITHUB_WORKSPACE/Muti-Metroo"
