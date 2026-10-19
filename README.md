@@ -25,7 +25,7 @@ Muti Metroo Manager is the web dashboard of the [Muti Metroo](https://mutimetroo
 
 ## Quick Start
 
-**Prerequisites:** Go 1.25+, Node.js 18+, npm
+**Prerequisites:** Go 1.26+, Node.js 22+, npm
 
 ```bash
 make build
