@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/agentprobe"
+	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/davshare"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/metrics"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/proxy"
 	"github.com/Muti-Metroo/Muti-Metroo-Manager/internal/store"
@@ -99,6 +100,22 @@ func New(opts Options) (*http.Server, SeedHealthFunc) {
 	api.Handle("/api/networks", networksListHandler(opts.Store))
 	api.Handle("/api/networks/", networkItemHandler(opts.Store, logger))
 	api.Handle("/api/positions", positionsHandler(opts.Store, logger))
+
+	// WebDAV file shares. The share API lives behind the manager token
+	// like the rest of /api; the /dav/ tree itself is mounted on the
+	// outer mux, outside the token gate, because OS WebDAV clients can
+	// only send per-share Basic credentials. The gateway rejects every
+	// request that lacks valid credentials for the share it names.
+	var gw *davshare.Gateway
+	if opts.Store != nil {
+		gw = davshare.NewGateway(opts.Store,
+			davshare.NewAgentClient(opts.AgentURL, opts.AgentToken, opts.TLSConfig), logger, "")
+		loopbackOnly := BindsLoopbackOnly(opts.Addr)
+		api.Handle("/api/shares", sharesListHandler(opts.Store, gw, logger, loopbackOnly))
+		api.Handle("/api/shares/", shareItemHandler(opts.Store, gw, logger, loopbackOnly))
+		mux.Handle(davshare.Prefix, gw)
+	}
+
 	mux.Handle("/api/", authMiddleware(opts.AuthToken, api))
 	if opts.AuthToken != "" {
 		mux.Handle("/api/auth/login", loginHandler(opts.AuthToken))

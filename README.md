@@ -12,6 +12,7 @@ Muti Metroo Manager is the web dashboard of the [Muti Metroo](https://mutimetroo
 - **Monitoring**: Dashboard stats (peers, streams, routes, exit nodes, SOCKS5, exit handler) with 5s polling
 - **Remote Shell**: xterm.js terminal to any agent via WebSocket binary protocol
 - **File Transfer**: Upload/download files to/from agents (with browseable remote filesystem)
+- **File Shares (WebDAV)**: Share an agent folder from the file browser and mount it with Finder, Windows Explorer, or Linux file managers; Manager translates WebDAV into the agent's signed file-transfer API
 - **Route Management**: View, add, and remove dynamic routes; view static routes; route trace simulator
 - **Port Forwarding**: Browse forward listeners and endpoints across the mesh
 - **DNS**: Mesh-host registry (name → IPv4/IPv6) and TLD suffix management
@@ -84,6 +85,39 @@ subprotocol- or cookie-based handoff was considered, but the upstream agent
 authenticates WebSocket upgrades via the `Authorization` header or the
 `?token=` query parameter, so there is no in-band alternative the browser can
 use today.
+
+## File shares (WebDAV)
+
+An operator can share a folder on any agent from the agent panel's Files tab
+(**Share**). Manager then serves that folder over WebDAV at
+`/dav/<name>/` on its own listener, so it can be mounted with standard OS
+clients: Finder (**Go > Connect to Server**), Windows (`net use` or **Map
+network drive**), GNOME Files / `gio mount`, davfs2, or `rclone mount`.
+Every WebDAV operation becomes a call to the connected agent's file-transfer
+API (`file/browse`, `file/download`, `file/upload`), which the agent signs
+and relays through the mesh, so the share stays inside the target agent's
+`file_transfer.allowed_paths`. Shares are managed under **Actions > File
+shares** (enable/disable, read-only, rotate password, delete) and persist in
+the SQLite database.
+
+- **Requirements**: the target agent has `file_transfer.enabled` with the
+  folder inside `allowed_paths`, and the management signing keys are set up
+  as for the Files tab. If the agent API needs a bearer token, configure it
+  on the manager (`-agent-token-file`); the token pasted into the browser is
+  not available to the WebDAV gateway.
+- **Authentication**: each share has its own user name and password (HTTP
+  Basic, bcrypt-hashed, generated and shown once unless you supply one).
+  `/dav/` is outside the manager token gate and only accepts the share's
+  credentials; repeated failures from one address are throttled (429).
+  Shares are read-only by default.
+- **Transport**: Manager has no TLS listener. Over plain HTTP the share
+  password and file contents travel unencrypted, and Windows refuses Basic
+  auth over HTTP unless `BasicAuthLevel` is raised; put Manager behind a
+  TLS-terminating reverse proxy for anything beyond a trusted network.
+- **Behaviour**: reads use ranged downloads with a 1 to 4 MiB read-ahead, so
+  previews and seeks do not pull whole files; writes are buffered to a
+  local temp file and uploaded when the client closes the file. `PROPFIND`
+  with `Depth: infinity` is refused.
 
 ## Configuration
 
@@ -213,7 +247,8 @@ The Vite dev server runs on [http://localhost:5173](http://localhost:5173) and p
 ```
 cmd/manager/            Go entrypoint, CLI flag parsing, graceful shutdown
 internal/
-  server/               HTTP routing: /api/proxy/*, /api/settings, /api/agent-meta[/*], SPA
+  server/               HTTP routing: /api/proxy/*, /api/settings, /api/agent-meta[/*], /api/shares[/*], /dav/*, SPA
+  davshare/             WebDAV file-share gateway: per-share Basic auth, agent-backed webdav.FileSystem
   proxy/                Reverse proxy to agent (HTTP + WebSocket relay)
   store/                SQLite-backed operator overrides + per-agent metadata (modernc.org/sqlite, pure Go)
   webui/                Embedded SPA (go:embed), content-type mapping, SPA fallback
@@ -223,6 +258,7 @@ frontend/
     components/
       MetroMap/         SVG topology: layout algorithm, stations, connections, tooltips
       AgentPanel/       Slide-in panel: info, routes, forwards, peers, shell, files, ping tabs (+ IconPicker)
+      FileShares/       WebDAV share dialogs: create from the file browser, list/manage, mount instructions
       ConfigWizard/     Wizard for generating Muti Metroo agent configs
       EntryConfigWizard/ Wizard for generating Mutiauk configs
       wizard/           Shared wizard primitives (Field, etc.)
@@ -245,6 +281,6 @@ Makefile                build, build-frontend, build-go, dev, clean targets
 
 ## Architecture
 
-**Go backend**: Minimal reverse proxy that sits between the browser and a Muti Metroo agent. All `/api/proxy/*` requests are stripped of the prefix and forwarded to the agent (HTTP and WebSocket). A small SQLite database (managed by `internal/store`) holds operator-set overrides for the advertised API/SOCKS5 addresses plus per-agent operator metadata (note + icon). The Vite-built frontend is embedded into the binary via `go:embed` and served with SPA fallback. External Go dependencies: `gorilla/websocket` (proxy) and `modernc.org/sqlite` (pure-Go SQLite driver).
+**Go backend**: Minimal reverse proxy that sits between the browser and a Muti Metroo agent. All `/api/proxy/*` requests are stripped of the prefix and forwarded to the agent (HTTP and WebSocket). A small SQLite database (managed by `internal/store`) holds operator-set overrides for the advertised API/SOCKS5 addresses plus per-agent operator metadata (note + icon). The Vite-built frontend is embedded into the binary via `go:embed` and served with SPA fallback. External Go dependencies: `gorilla/websocket` (proxy), `modernc.org/sqlite` (pure-Go SQLite driver), and `golang.org/x/net/webdav` plus `golang.org/x/crypto/bcrypt` (file shares).
 
 **React frontend**, Single-page app built with React 19, TypeScript, and Vite, styled with Tailwind v4 + FlyonUI (compiled by the Vite plugin from `frontend/src/styles/app.css`; FlyonUI's runtime JS is not loaded, since React owns every interactive component). The router (`frontend/src/router.ts`) is a hand-rolled URL state hook, no routing library, encoding the major tab, sub-tab, selected agent, and agent-panel tab into the path + query (`/<major>/<sub>?agent=&panel=`). State is managed with React hooks (`useState`, `useRef`, `useEffect` polling). The shell tab uses xterm.js with a custom binary WebSocket protocol for PTY communication.

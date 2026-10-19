@@ -44,6 +44,7 @@ import TestResultsModal from './components/TestResultsModal';
 import TokenDialog from './components/TokenDialog';
 import Alert from './components/Alert';
 import SettingsDialog from './components/SettingsDialog';
+import FileSharesDialog from './components/FileShares/FileSharesDialog';
 import { ensureHttpScheme } from './util/url';
 import { summarizeMeshHealth, type MeshHealth } from './util/meshHealth';
 import { knownNetworks } from './util/networks';
@@ -134,6 +135,7 @@ export default function App() {
     sounds_enabled: true,
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [fileSharesOpen, setFileSharesOpen] = useState(false);
   const [agentMeta, setAgentMeta] = useState<AgentMetadataMap>({});
   // Network display-name overrides ({id: name}); only renamed networks appear.
   // Membership itself rides on agentMeta.networks.
@@ -673,6 +675,12 @@ export default function App() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
+      {fileSharesOpen && (
+        <FileSharesDialog
+          agents={topology?.agents ?? EMPTY_AGENTS}
+          onClose={() => setFileSharesOpen(false)}
+        />
+      )}
       <main className={`app-main${selectedAgentId ? ' panel-open' : ''}`}>
         <Tabs
           className="border-hairline border-b"
@@ -690,6 +698,7 @@ export default function App() {
               onOpenAgentWizard={handleOpenConfigWizard}
               onOpenEntryWizard={handleOpenEntryWizard}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenFileShares={() => setFileSharesOpen(true)}
               onSignOut={getToken() ? handleSignOut : null}
             />
           }

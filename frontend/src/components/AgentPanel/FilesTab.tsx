@@ -5,8 +5,10 @@ import { browseFiles, downloadFile, uploadFile, chmodFile, deleteFile } from '..
 import { downloadBlob } from '../../util/download';
 import { isFileTransferDenied, mapManagementAuthError } from '../../util/authErrors';
 import { useModalDismiss } from '../../hooks/useModalDismiss';
+import { agentLabel } from '../../util/useTopologyDiff';
 import Alert from '../Alert';
 import ConfirmDialog from '../ConfirmDialog';
+import ShareFolderDialog from '../FileShares/ShareFolderDialog';
 
 function parseErrFields(err: unknown): { code: unknown; message: string } {
   const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
@@ -326,6 +328,8 @@ function UploadProgressBar({ progress, onCancel }: UploadProgressBarProps) {
 
 export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps) {
   const [currentPath, setCurrentPath] = useState<string | null>(null);
+  // "Share this folder" dialog, for the directory currently listed.
+  const [sharingPath, setSharingPath] = useState<string | null>(null);
   const [entries, setEntries] = useState<FileBrowseEntry[]>([]);
   const [roots, setRoots] = useState<string[] | null>(null);
   const [wildcard, setWildcard] = useState(false);
@@ -1138,9 +1142,25 @@ export default function FilesTab({ agent, disabled, onDisabled }: FilesTabProps)
             >
               Refresh
             </button>
+            <button
+              className="btn btn-xs btn-soft"
+              onClick={() => currentPath && setSharingPath(currentPath)}
+              disabled={!currentPath || !!viewingFile}
+              title="Share this folder over WebDAV"
+            >
+              Share
+            </button>
           </div>
         )}
       </div>
+      {sharingPath && (
+        <ShareFolderDialog
+          agentId={agent.id}
+          agentLabel={agentLabel(agent)}
+          remotePath={sharingPath}
+          onClose={() => setSharingPath(null)}
+        />
+      )}
 
       {/* Upload progress */}
       {uploadProgress && (

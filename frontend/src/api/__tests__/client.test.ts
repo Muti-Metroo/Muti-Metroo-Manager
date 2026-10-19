@@ -243,4 +243,30 @@ describe('manager auth', () => {
     const { managerLogin } = await import('../client');
     await expect(managerLogin('wrong')).rejects.toThrow('Invalid manager token');
   });
+
+  it('deleteShare resolves on 204 without parsing a body and sends the auth header', async () => {
+    setToken('agent-token');
+    const fn = mockFetchWithHeaders({ status: 204, body: null });
+    const { deleteShare } = await import('../client');
+    await expect(deleteShare(7)).resolves.toBeUndefined();
+    const [url, init] = fn.mock.calls[0] as unknown as FetchArgs;
+    expect(url).toBe('/api/shares/7');
+    expect(init.method).toBe('DELETE');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer agent-token');
+  });
+
+  it('deleteShare signals a manager-realm 401', async () => {
+    mockFetchWithHeaders({
+      status: 401,
+      body: null,
+      wwwAuth: 'Bearer realm="muti-metroo-manager"',
+    });
+    const events: string[] = [];
+    const onManager = () => events.push('manager');
+    window.addEventListener('manager-auth-required', onManager);
+    const { deleteShare } = await import('../client');
+    await expect(deleteShare(7)).rejects.toThrow('Manager authentication required');
+    window.removeEventListener('manager-auth-required', onManager);
+    expect(events).toEqual(['manager']);
+  });
 });

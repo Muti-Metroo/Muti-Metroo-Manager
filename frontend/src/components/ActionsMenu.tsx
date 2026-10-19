@@ -11,6 +11,7 @@ interface ActionsMenuProps {
   onOpenAgentWizard: () => void;
   onOpenEntryWizard: () => void;
   onOpenSettings: () => void;
+  onOpenFileShares: () => void;
   // Sign out is only meaningful when a token is currently held — pass
   // null to hide the menu item (so a token-less deployment doesn't
   // expose an inert button).
@@ -70,6 +71,7 @@ export default function ActionsMenu({
   onOpenAgentWizard,
   onOpenEntryWizard,
   onOpenSettings,
+  onOpenFileShares,
   onSignOut,
 }: ActionsMenuProps) {
   const [open, setOpen] = useState(false);
@@ -168,6 +170,11 @@ export default function ActionsMenu({
                 icon="icon-[tabler--door-enter]"
                 label="Generate Mutiauk config..."
                 onClick={() => closeAndRun(onOpenEntryWizard)}
+              />
+              <MenuItem
+                icon="icon-[tabler--share]"
+                label="File shares..."
+                onClick={() => closeAndRun(onOpenFileShares)}
               />
               <MenuItem
                 icon="icon-[tabler--settings]"

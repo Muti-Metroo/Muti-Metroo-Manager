@@ -68,6 +68,10 @@ make clean
 
 IMPORTANT: After frontend changes, you must rebuild **both** the frontend and the Go binary. The Go binary embeds `internal/webui/dist/` via `go:embed`, so stale dist means stale UI.
 
+### File share end-to-end tests
+
+`make e2e-fileshare` builds a real target agent, gateway agent, and manager (agent source from `../Muti-Metroo`) and checks the WebDAV gateway with curl (`scripts/e2e-fileshare.sh`). `make e2e-fileshare-docker` runs the same in a Linux container with the litmus WebDAV compliance suite and a davfs2 mount. Run one of them after changing `internal/davshare` or the agent file API.
+
 ## Formatting
 
 Frontend JS/TS/CSS is formatted with Prettier (`frontend/.prettierrc.json`). Run
@@ -148,6 +152,10 @@ Tables (see `internal/store/migrations.go`, schema versioned via `PRAGMA user_ve
   `icon` key (the icon catalog itself lives in the frontend; the backend
   just stores the chosen key, lower-case `[a-z0-9_-]{0,32}`). Rows where
   both fields are empty are deleted, not stored.
+- `file_shares`: WebDAV file shares (name slug, agent_id, remote_path,
+  read_only, username, bcrypt password_hash, enabled). Served by
+  `internal/davshare` at `/dav/{name}/`, outside the `/api` token gate,
+  behind per-share Basic auth.
 
 Future domains (saved searches, etc.) drop in as new tables behind their
 own typed methods; the generic key/value table is not the extension
@@ -171,6 +179,10 @@ internal/server/metrics.go   Per-request instrumentation middleware + optional /
 internal/proxy/proxy.go      Reverse proxy: strips /api/proxy prefix, forwards to agent
 internal/proxy/websocket.go  WebSocket relay (gorilla/websocket), bidirectional binary frames
 internal/store/store.go      SQLite-backed settings + per-agent metadata (modernc.org/sqlite, pure Go)
+internal/store/shares.go     File-share rows (typed CRUD + validation)
+internal/server/shares.go    /api/shares[/{id}] CRUD (password generated/hashed here, shown once)
+internal/davshare/           WebDAV gateway: agent API client, webdav.FileSystem adapter (stat cache,
+                             ranged read-ahead, write-on-close upload), Basic auth + failed-auth throttle
 internal/store/migrations.go Schema migrations keyed on PRAGMA user_version
 internal/webui/embed.go      go:embed all:dist
 internal/webui/webui.go      Static file server with SPA fallback (index.html for extensionless paths)
@@ -194,7 +206,8 @@ frontend/src/components/Header.tsx, Footer.tsx, Tabs.tsx        Chrome (Header o
 frontend/src/components/DialogHeader.tsx    Shared dialog title bar + close button
 frontend/src/util/networks.ts Membership string parsing/normalising, the mesh-wide network list,
                              and the caret-token helpers the typeahead completes against
-frontend/src/components/ActionsMenu.tsx     Header dropdown: mesh test, sleep/wake, wizards, settings
+frontend/src/components/ActionsMenu.tsx     Header dropdown: mesh test, sleep/wake, wizards, file shares, settings
+frontend/src/components/FileShares/        Share-this-folder dialog (FilesTab), file-shares list, per-OS mount help
 frontend/src/components/AgentSearch.tsx     Topology agent quick-search (`/` hotkey)
 frontend/src/components/RoutesPanel.tsx, RouteTable.tsx, RouteTraceSection.tsx, RouteCommentDialog.tsx   Routes UI
 frontend/src/components/ForwardRouteTable.tsx   Port-forwarding routes

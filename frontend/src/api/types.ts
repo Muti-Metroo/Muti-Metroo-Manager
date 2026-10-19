@@ -639,3 +639,51 @@ export interface ShellMeta {
   args?: string[];
   tty?: ShellTTYSettings;
 }
+
+// --- WebDAV file shares (Muti Metroo Manager's own /api/shares) ---
+
+// A remote folder served by the manager at `mount_path` (/dav/{name}/)
+// behind per-share HTTP Basic auth. The password is never returned
+// after creation or rotation.
+export interface FileShare {
+  id: number;
+  name: string;
+  agent_id: string;
+  remote_path: string;
+  read_only: boolean;
+  username: string;
+  enabled: boolean;
+  created_at: string;
+  mount_path: string;
+}
+
+export interface FileShareList {
+  shares: FileShare[];
+  // True when the manager listens on loopback only, so only clients on
+  // the manager host itself can mount a share.
+  loopback_only: boolean;
+}
+
+export interface FileShareCreateRequest {
+  name: string;
+  agent_id: string;
+  remote_path: string;
+  read_only: boolean;
+  username?: string;
+  password?: string;
+}
+
+export interface FileShareUpdateRequest {
+  enabled?: boolean;
+  read_only?: boolean;
+  rotate_password?: boolean;
+}
+
+// Create / update response. `password` is present only when the manager
+// generated one (create without a password, or rotate_password).
+export interface FileShareWithPassword {
+  share: FileShare;
+  password?: string;
+  // Same as FileShareList.loopback_only.
+  loopback_only: boolean;
+}

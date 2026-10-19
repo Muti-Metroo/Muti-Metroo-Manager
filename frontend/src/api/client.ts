@@ -32,6 +32,10 @@ import type {
   AgentMetadataMap,
   NetworkNameMap,
   PositionMap,
+  FileShareList,
+  FileShareCreateRequest,
+  FileShareUpdateRequest,
+  FileShareWithPassword,
 } from './types';
 
 const BASE = '';
@@ -208,6 +212,7 @@ async function fetchJSON<T>(url: string, method = 'GET', body?: unknown): Promis
     }
     throw new ApiError(msg || `API error ${resp.status}: ${url}`, resp.status);
   }
+  if (resp.status === 204) return undefined as T;
   return resp.json();
 }
 
@@ -265,6 +270,27 @@ export function getPositions(): Promise<PositionMap> {
 // map clears it — the reset-view action).
 export function putPositions(positions: PositionMap): Promise<{ count: number }> {
   return fetchJSON('/api/positions', 'PUT', positions);
+}
+
+// --- WebDAV file shares ---
+
+export function listShares(): Promise<FileShareList> {
+  return fetchJSON('/api/shares');
+}
+
+export function createShare(req: FileShareCreateRequest): Promise<FileShareWithPassword> {
+  return fetchJSON('/api/shares', 'POST', req);
+}
+
+export function updateShare(
+  id: number,
+  req: FileShareUpdateRequest,
+): Promise<FileShareWithPassword> {
+  return fetchJSON(`/api/shares/${id}`, 'PATCH', req);
+}
+
+export function deleteShare(id: number): Promise<void> {
+  return fetchJSON(`/api/shares/${id}`, 'DELETE');
 }
 
 export function getMeshTest(forceRefresh = false): Promise<MeshTestResponse> {

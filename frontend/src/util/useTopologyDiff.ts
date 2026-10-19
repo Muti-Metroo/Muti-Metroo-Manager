@@ -45,7 +45,8 @@ export function connKey(c: Pick<TopologyConnection, 'from_agent' | 'to_agent'>):
     : `${c.to_agent}|${c.from_agent}`;
 }
 
-function agentLabel(a: TopologyAgentInfo): string {
+/** The name an agent is shown by: display name, else hostname, else short id. */
+export function agentLabel(a: TopologyAgentInfo): string {
   return a.display_name || a.hostname || a.short_id;
 }
 

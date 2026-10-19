@@ -15,6 +15,7 @@ var migrations = []func(*sql.Tx) error{
 	migrate4AddAgentNetworks,
 	migrate5CreateNetworks,
 	migrate6CreatePositions,
+	migrate7CreateFileShares,
 }
 
 func (s *Store) migrate() error {
@@ -105,6 +106,27 @@ func migrate6CreatePositions(tx *sql.Tx) error {
 			x          REAL NOT NULL,
 			y          REAL NOT NULL,
 			updated_at INTEGER NOT NULL
+		)
+	`)
+	return err
+}
+
+// migrate7CreateFileShares holds the WebDAV file shares: a remote folder
+// on one agent served at /dav/{name}/ behind per-share Basic auth. The
+// password is stored as a bcrypt hash only.
+func migrate7CreateFileShares(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		CREATE TABLE file_shares (
+			id            INTEGER PRIMARY KEY AUTOINCREMENT,
+			name          TEXT NOT NULL UNIQUE,
+			agent_id      TEXT NOT NULL,
+			remote_path   TEXT NOT NULL,
+			read_only     INTEGER NOT NULL DEFAULT 1,
+			username      TEXT NOT NULL,
+			password_hash TEXT NOT NULL,
+			enabled       INTEGER NOT NULL DEFAULT 1,
+			created_at    INTEGER NOT NULL,
+			updated_at    INTEGER NOT NULL
 		)
 	`)
 	return err

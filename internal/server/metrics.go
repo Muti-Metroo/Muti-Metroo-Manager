@@ -96,7 +96,8 @@ func instrumentMiddleware(inst *instrumentation, next http.Handler) http.Handler
 func methodLabel(method string) string {
 	switch method {
 	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut,
-		http.MethodPatch, http.MethodDelete, http.MethodOptions:
+		http.MethodPatch, http.MethodDelete, http.MethodOptions,
+		"PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK":
 		return method
 	}
 	return "OTHER"
@@ -107,7 +108,7 @@ func methodLabel(method string) string {
 // becomes its own series.
 func routeLabel(path string) string {
 	switch path {
-	case "/healthz", "/api/settings", "/api/agent-meta":
+	case "/healthz", "/api/settings", "/api/agent-meta", "/api/shares":
 		return path
 	}
 	switch {
@@ -115,6 +116,10 @@ func routeLabel(path string) string {
 		return "/api/agent-meta/:id"
 	case strings.HasPrefix(path, "/api/proxy/"):
 		return "/api/proxy/*"
+	case strings.HasPrefix(path, "/api/shares/"):
+		return "/api/shares/:id"
+	case strings.HasPrefix(path, "/dav/"):
+		return "/dav/*"
 	}
 	return "other"
 }
