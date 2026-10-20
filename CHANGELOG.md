@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.45](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.44...metroo-manager-v0.2.45) (2026-10-20)
+
+
+### Bug Fixes
+
+* **davshare:** keep macOS metadata off the shared folder ([b5633be](https://github.com/Muti-Metroo/Muti-Metroo-Manager/commit/b5633be8d8788a8cf01227e88b9ffa30d1535f2e))
+
 ## [0.2.44](https://github.com/Muti-Metroo/Muti-Metroo-Manager/compare/metroo-manager-v0.2.43...metroo-manager-v0.2.44) (2026-10-19)
 
 
