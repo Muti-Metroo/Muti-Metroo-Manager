@@ -60,7 +60,7 @@ func (d *dirFile) Readdir(count int) ([]os.FileInfo, error) {
 			return nil, asPathError("readdir", d.fi.name, err)
 		}
 		for _, e := range entries {
-			if e.Name == "" || e.Name == "." || e.Name == ".." {
+			if e.Name == "" || e.Name == "." || e.Name == ".." || isMacMetadata(e.Name) {
 				continue
 			}
 			fi := entryInfo(e.Name, e)

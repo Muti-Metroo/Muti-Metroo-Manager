@@ -117,7 +117,9 @@ the SQLite database.
 - **Behaviour**: reads use ranged downloads with a 1 to 4 MiB read-ahead, so
   previews and seeks do not pull whole files; writes are buffered to a
   local temp file and uploaded when the client closes the file. `PROPFIND`
-  with `Depth: infinity` is refused.
+  with `Depth: infinity` is refused. macOS metadata (`._*` AppleDouble
+  files, `.DS_Store`, and similar) never reaches the agent: Manager keeps it
+  in memory until it restarts, and hides existing copies in the folder.
 
 ## Configuration
 

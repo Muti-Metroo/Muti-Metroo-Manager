@@ -182,7 +182,8 @@ internal/store/store.go      SQLite-backed settings + per-agent metadata (modern
 internal/store/shares.go     File-share rows (typed CRUD + validation)
 internal/server/shares.go    /api/shares[/{id}] CRUD (password generated/hashed here, shown once)
 internal/davshare/           WebDAV gateway: agent API client, webdav.FileSystem adapter (stat cache,
-                             ranged read-ahead, write-on-close upload), Basic auth + failed-auth throttle
+                             ranged read-ahead, write-on-close upload), Basic auth + failed-auth throttle;
+                             macOS metadata (._*, .DS_Store) is kept in memory, never on the agent (meta.go)
 internal/store/migrations.go Schema migrations keyed on PRAGMA user_version
 internal/webui/embed.go      go:embed all:dist
 internal/webui/webui.go      Static file server with SPA fallback (index.html for extensionless paths)

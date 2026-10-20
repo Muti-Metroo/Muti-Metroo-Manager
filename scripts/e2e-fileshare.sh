@@ -178,6 +178,11 @@ check "Range" "webdav" "$(curl -s "${U[@]}" -H 'Range: bytes=6-11' "$B/dir/small
 check "Range status" 206 "$(code "${U[@]}" -H 'Range: bytes=6-11' "$B/dir/small.txt")"
 check "GET missing" 404 "$(code "${U[@]}" "$B/dir/nope.txt")"
 check "served with sandbox CSP" 1 "$(curl -sI "${U[@]}" "$B/dir/small.txt" | grep -ci 'content-security-policy: sandbox' || true)"
+echo "finder" > "$SHARE/.DS_Store"
+check_in "PUT macOS metadata is accepted" "$(code "${U[@]}" -T "$WORK/small.txt" "$B/dir/._small.txt")" 201 204
+[ ! -e "$SHARE/dir/._small.txt" ] && pass "macOS metadata not stored on agent" || fail "macOS metadata not stored on agent"
+check "macOS metadata reads as missing" 404 "$(code "${U[@]}" "$B/.DS_Store")"
+check "macOS metadata left out of listings" 0 "$(curl -s "${U[@]}" -X PROPFIND -H 'Depth: 1' "$B/" | grep -c 'DS_Store' || true)"
 
 dd if=/dev/urandom of="$WORK/big.bin" bs=1048576 count=20 2>/dev/null
 check "PUT 20 MiB" 201 "$(code "${U[@]}" -T "$WORK/big.bin" "$B/big.bin")"

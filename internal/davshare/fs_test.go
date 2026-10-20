@@ -118,8 +118,8 @@ func TestStatCache(t *testing.T) {
 		t.Errorf("stat calls = %d, want 1 (cached)", n)
 	}
 	// Negative results are cached too.
-	fs.Stat(ctx, "/._a.txt")
-	fs.Stat(ctx, "/._a.txt")
+	fs.Stat(ctx, "/missing.txt")
+	fs.Stat(ctx, "/missing.txt")
 	if n := fa.count("browse:stat"); n != 2 {
 		t.Errorf("stat calls = %d, want 2 after negative cache", n)
 	}
@@ -500,6 +500,177 @@ func TestMkdirRenameRemove(t *testing.T) {
 		t.Errorf("remove root: err = %v", err)
 	}
 	assertConfined(t, fa)
+}
+
+// macOS metadata never reaches the agent: it lives in memory, where it
+// behaves like ordinary files, and pre-existing copies on the agent are
+// neither visible nor touched.
+func TestMacMetadataInMemory(t *testing.T) {
+	fa := newFakeAgent(t)
+	fa.write("/srv/share/a.txt", []byte("hello"))
+	fa.write("/srv/share/._a.txt", []byte("appledouble on the agent"))
+	fa.write("/srv/share/.DS_Store", []byte("finder"))
+	fs, _ := newTestFS(t, fa, false)
+	ctx := context.Background()
+
+	readAll := func(name string) string {
+		t.Helper()
+		f, err := fs.OpenFile(ctx, name, os.O_RDONLY, 0)
+		if err != nil {
+			t.Fatalf("open %q: %v", name, err)
+		}
+		defer f.Close()
+		b, _ := io.ReadAll(f)
+		return string(b)
+	}
+	writeAll := func(name string, flag int, data string) {
+		t.Helper()
+		f, err := fs.OpenFile(ctx, name, flag, 0o644)
+		if err != nil {
+			t.Fatalf("open %q for write: %v", name, err)
+		}
+		if _, err := f.Write([]byte(data)); err != nil {
+			t.Fatalf("write %q: %v", name, err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatalf("close %q: %v", name, err)
+		}
+	}
+
+	// The agent's copies are invisible; the share starts with none.
+	for _, name := range []string{"/._a.txt", "/.DS_Store"} {
+		if _, err := fs.Stat(ctx, name); !os.IsNotExist(err) {
+			t.Errorf("Stat(%q) = %v, want not exist", name, err)
+		}
+	}
+
+	// Write, read back, rewrite in place (macOS read-modify-write), and
+	// append.
+	writeAll("/._a.txt", os.O_RDWR|os.O_CREATE|os.O_TRUNC, "xattrs-v1")
+	if got := readAll("/._a.txt"); got != "xattrs-v1" {
+		t.Errorf("read back = %q", got)
+	}
+	f, err := fs.OpenFile(ctx, "/._a.txt", os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Seek(7, io.SeekStart)
+	f.Write([]byte("v2"))
+	f.Close()
+	writeAll("/._a.txt", os.O_WRONLY|os.O_APPEND, "+more")
+	if got := readAll("/._a.txt"); got != "xattrs-v2+more" {
+		t.Errorf("after rewrite and append = %q", got)
+	}
+	if fi, err := fs.Stat(ctx, "/._a.txt"); err != nil || fi.Size() != int64(len("xattrs-v2+more")) {
+		t.Errorf("Stat = %v, %v", fi, err)
+	}
+
+	// Folders, rename, remove.
+	if err := fs.Mkdir(ctx, "/.TemporaryItems", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeAll("/.TemporaryItems/._tmp", os.O_RDWR|os.O_CREATE, "t")
+	if err := fs.Rename(ctx, "/._a.txt", "/._b.txt"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fs.Stat(ctx, "/._a.txt"); !os.IsNotExist(err) {
+		t.Errorf("old name after rename: %v", err)
+	}
+	if got := readAll("/._b.txt"); got != "xattrs-v2+more" {
+		t.Errorf("renamed = %q", got)
+	}
+	if err := fs.Rename(ctx, "/a.txt", "/._a.txt"); !os.IsPermission(err) {
+		t.Errorf("rename of a real file onto metadata = %v, want permission error", err)
+	}
+	if err := fs.RemoveAll(ctx, "/.TemporaryItems"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fs.Stat(ctx, "/.TemporaryItems/._tmp"); !os.IsNotExist(err) {
+		t.Errorf("child after RemoveAll: %v", err)
+	}
+
+	// O_EXCL on existing metadata fails like on a file.
+	if _, err := fs.OpenFile(ctx, "/._b.txt", os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o644); !os.IsExist(err) {
+		t.Errorf("O_EXCL on existing metadata = %v, want exist error", err)
+	}
+
+	// Metadata follows a real folder through rename and delete.
+	if err := fs.Mkdir(ctx, "/d", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeAll("/d/._x", os.O_RDWR|os.O_CREATE, "attrs")
+	if err := fs.Rename(ctx, "/d", "/e"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readAll("/e/._x"); got != "attrs" {
+		t.Errorf("metadata after folder rename = %q", got)
+	}
+	if _, err := fs.Stat(ctx, "/d/._x"); !os.IsNotExist(err) {
+		t.Errorf("metadata left at the old folder path: %v", err)
+	}
+	if err := fs.RemoveAll(ctx, "/e"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fs.Stat(ctx, "/e/._x"); !os.IsNotExist(err) {
+		t.Errorf("metadata survived folder delete: %v", err)
+	}
+
+	// Oversized metadata is refused.
+	big, err := fs.OpenFile(ctx, "/._huge", os.O_RDWR|os.O_CREATE, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := big.Write(make([]byte, metaFileLimit+1)); err == nil {
+		t.Error("write over metaFileLimit succeeded")
+	}
+	big.Close()
+
+	// Listings show only the real file, and the agent never saw a
+	// metadata path; its own copies are untouched.
+	d, err := fs.OpenFile(ctx, "/", os.O_RDONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := d.Readdir(0)
+	if len(entries) != 1 || entries[0].Name() != "a.txt" {
+		names := []string{}
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("listing = %v, want only a.txt", names)
+	}
+	for _, p := range fa.seenPaths() {
+		if isMacMetadata(strings.TrimPrefix(p, "/srv/share")) {
+			t.Errorf("agent saw metadata path %q", p)
+		}
+	}
+
+	for _, name := range []string{"/.DS_Store.txt", "/a._b", "/_a"} {
+		if isMacMetadata(name) {
+			t.Errorf("isMacMetadata(%q) = true", name)
+		}
+	}
+}
+
+// Old metadata is evicted once a share holds more than metaTotalLimit.
+func TestMacMetadataEviction(t *testing.T) {
+	var s metaStore
+	chunk := make([]byte, metaFileLimit)
+	for i := 0; i < metaTotalLimit/metaFileLimit+2; i++ {
+		f, _ := s.open("/._f"+strconv.Itoa(i), os.O_RDWR|os.O_CREATE)
+		f.Write(chunk)
+		f.Close()
+	}
+	if s.total > metaTotalLimit {
+		t.Errorf("total = %d, over the limit %d", s.total, metaTotalLimit)
+	}
+	if _, err := s.stat("/._f0"); !os.IsNotExist(err) {
+		t.Errorf("oldest entry survived eviction: %v", err)
+	}
+	last := "/._f" + strconv.Itoa(metaTotalLimit/metaFileLimit+1)
+	if _, err := s.stat(last); err != nil {
+		t.Errorf("newest entry evicted: %v", err)
+	}
 }
 
 func TestReadOnlyFS(t *testing.T) {

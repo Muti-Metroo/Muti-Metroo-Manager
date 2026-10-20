@@ -45,6 +45,7 @@ type FS struct {
 	readOnly bool
 	tempDir  string
 	cache    statCache
+	meta     metaStore // macOS metadata, kept off the agent (meta.go)
 }
 
 var _ webdav.FileSystem = (*FS)(nil)
@@ -135,6 +136,9 @@ func (fs *FS) stat(ctx context.Context, name string) (*fileInfo, error) {
 	if err != nil {
 		return nil, &os.PathError{Op: "stat", Path: name, Err: err}
 	}
+	if isMacMetadata(clean) {
+		return fs.meta.stat(clean)
+	}
 	if fi, err, ok := fs.cache.get(full); ok {
 		return fi, err
 	}
@@ -163,6 +167,12 @@ func (fs *FS) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
 	if clean == "/" {
 		return &os.PathError{Op: "mkdir", Path: name, Err: os.ErrExist}
 	}
+	if isMacMetadata(clean) {
+		if err := fs.meta.mkdir(clean); err != nil {
+			return &os.PathError{Op: "mkdir", Path: name, Err: err}
+		}
+		return nil
+	}
 	defer fs.invalidate(clean, false)
 	if err := fs.client.Mkdir(ctx, fs.agentID, full); err != nil {
 		return asPathError("mkdir", name, err)
@@ -182,6 +192,11 @@ func (fs *FS) RemoveAll(ctx context.Context, name string) error {
 	}
 	if clean == "/" {
 		return &os.PathError{Op: "remove", Path: name, Err: os.ErrPermission}
+	}
+	// Metadata goes with the real folder it belongs to.
+	fs.meta.removeAll(clean)
+	if isMacMetadata(clean) {
+		return nil
 	}
 	defer fs.invalidate(clean, true)
 	if err := fs.client.Delete(ctx, fs.agentID, full, true); err != nil {
@@ -207,8 +222,14 @@ func (fs *FS) Rename(ctx context.Context, oldName, newName string) error {
 	if err != nil {
 		return &os.PathError{Op: "rename", Path: newName, Err: err}
 	}
-	if oldClean == "/" || newClean == "/" {
+	if oldClean == "/" || newClean == "/" || isMacMetadata(oldClean) != isMacMetadata(newClean) {
 		return &os.PathError{Op: "rename", Path: oldName, Err: os.ErrPermission}
+	}
+	if isMacMetadata(oldClean) {
+		if !fs.meta.rename(oldClean, newClean) {
+			return &os.PathError{Op: "rename", Path: oldName, Err: os.ErrNotExist}
+		}
+		return nil
 	}
 	defer func() {
 		fs.invalidate(oldClean, true)
@@ -217,6 +238,8 @@ func (fs *FS) Rename(ctx context.Context, oldName, newName string) error {
 	if err := fs.client.Rename(ctx, fs.agentID, oldFull, newFull); err != nil {
 		return asPathError("rename", oldName, err)
 	}
+	// Metadata goes with the real folder it belongs to.
+	fs.meta.rename(oldClean, newClean)
 	return nil
 }
 
@@ -232,6 +255,9 @@ func (fs *FS) OpenFile(ctx context.Context, name string, flag int, perm os.FileM
 	write := flag&(os.O_WRONLY|os.O_RDWR|os.O_APPEND|os.O_CREATE|os.O_TRUNC) != 0
 	if write && fs.readOnly {
 		return nil, &os.PathError{Op: "open", Path: name, Err: os.ErrPermission}
+	}
+	if isMacMetadata(clean) {
+		return fs.meta.open(clean, flag)
 	}
 	fi, statErr := fs.stat(ctx, name)
 	if statErr != nil && !os.IsNotExist(statErr) {
